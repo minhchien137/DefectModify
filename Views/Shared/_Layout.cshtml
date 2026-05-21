@@ -22,7 +22,7 @@
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm box-shadow mb-3 px-2">
             <div class="container-fluid">
                 <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
-                    🔧 DefectModify
+                    🔧 Data Modify
                 </a>
                 <button class="navbar-toggler border-0" type="button"
                         data-bs-toggle="collapse" data-bs-target=".navbar-collapse"
@@ -32,16 +32,14 @@
                 </button>
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1 gap-1">
+                        <li class="d-none d-sm-flex nav-divider"></li>
                         <li class="nav-item">
-                            <a class="nav-link" asp-controller="Defect" asp-action="Modify">🏠 Home</a>
+                            <a class="nav-link" asp-controller="Defect" asp-action="Modify">❌ Dữ liệu Defect</a>
                         </li>
                         <li class="d-none d-sm-flex nav-divider"></li>
                         <li class="nav-item">
-                            <a class="nav-link" asp-controller="Defect" asp-action="Modify">⚙️ Sửa đổi dữ liệu</a>
+                            <a class="nav-link" asp-controller="Downtime" asp-action="Modify">⏳ Dữ liệu Downtime</a>
                         </li>
-                        @* <li class="nav-item">
-                            <a class="nav-link" asp-controller="Defect" asp-action="Log">📋 Lịch sử thay đổi</a>
-                        </li> *@
                     </ul>
                 </div>
             </div>

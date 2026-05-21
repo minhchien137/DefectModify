@@ -1,0 +1,559 @@
+@model List<DefectModify.Models.SVN_Downtime_Info>
+@{
+    ViewData["Title"] = "Sửa đổi dữ liệu Downtime";
+    var stateList = ViewBag.StateList as List<string> ?? new List<string>();
+}
+
+<style>
+    :root {
+        --sage:        #6BA88A;
+        --sage-light:  #A8C9B8;
+        --sage-dark:   #3E7A5E;
+        --sage-bg:     #EFF7F3;
+        --cream:       #F7F4EF;
+        --border:      #D4E6DC;
+        --row-hover:   #EBF5F0;
+        --text-main:   #2D3748;
+        --text-muted:  #718096;
+        --danger:      #E53E3E;
+        --danger-bg:   rgba(229,62,62,.08);
+        --danger-bdr:  rgba(229,62,62,.28);
+        --white:       #FFFFFF;
+    }
+
+    body { background: var(--cream); }
+
+    /* ---- Header ---- */
+    .page-header {
+        background: linear-gradient(135deg, var(--sage-dark) 0%, var(--sage) 100%);
+        color: #fff;
+        border-radius: 14px;
+        padding: 1.4rem 1.8rem;
+        margin-bottom: 1.4rem;
+        box-shadow: 0 6px 24px rgba(62,122,94,.22);
+    }
+    .page-header h2 { font-size: 1.45rem; font-weight: 700; margin: 0; }
+    .page-header p  { font-size: .88rem; opacity: .82; margin: .2rem 0 0; }
+
+    /* ---- Filter card ---- */
+    .filter-card {
+        background: var(--white);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.1rem 1.4rem 1rem;
+        margin-bottom: 1.4rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,.05);
+    }
+    .filter-label {
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--sage-dark);
+        display: block;
+        margin-bottom: .3rem;
+    }
+    .filter-card .form-control,
+    .filter-card .form-select {
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        font-size: .88rem;
+        color: var(--text-main);
+        background: #FAFCFB;
+    }
+    .filter-card .form-control:focus,
+    .filter-card .form-select:focus {
+        border-color: var(--sage);
+        box-shadow: 0 0 0 3px rgba(107,168,138,.18);
+        background: #fff;
+    }
+    .btn-filter {
+        background: var(--sage);
+        color: #fff;
+        border: none;
+        border-radius: 9px;
+        padding: .48rem 1.2rem;
+        font-weight: 600;
+        font-size: .88rem;
+        transition: background .2s;
+    }
+    .btn-filter:hover { background: var(--sage-dark); color: #fff; }
+    .btn-reset {
+        background: #fff;
+        color: var(--text-muted);
+        border: 1.5px solid #CBD5E0;
+        border-radius: 9px;
+        padding: .48rem .9rem;
+        font-size: .88rem;
+        font-weight: 600;
+        transition: all .2s;
+        text-decoration: none;
+    }
+    .btn-reset:hover { background: #F7FAFC; color: var(--text-main); }
+
+    /* ---- Alerts ---- */
+    .alert-ok {
+        background: rgba(72,187,120,.1);
+        border: 1px solid rgba(72,187,120,.3);
+        color: #276749;
+        border-radius: 10px;
+        padding: .75rem 1rem .75rem 1.1rem;
+        margin-bottom: 1rem;
+        font-size: .9rem;
+    }
+    .alert-err {
+        background: rgba(229,62,62,.08);
+        border: 1px solid rgba(229,62,62,.3);
+        color: #c53030;
+        border-radius: 10px;
+        padding: .75rem 1rem;
+        margin-bottom: 1rem;
+        font-size: .9rem;
+    }
+
+    /* ---- Table card ---- */
+    .table-card {
+        background: var(--white);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,.06);
+        overflow: hidden;
+    }
+    .table-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: .85rem 1.2rem;
+        border-bottom: 2px solid var(--border);
+        background: var(--sage-bg);
+    }
+    .table-card-header .title {
+        font-size: .88rem;
+        font-weight: 700;
+        color: var(--sage-dark);
+    }
+    .tab-badge {
+        display: inline-block;
+        background: var(--sage);
+        color: #fff;
+        font-size: .68rem;
+        border-radius: 10px;
+        padding: .1rem .5rem;
+        margin-left: .35rem;
+        font-weight: 700;
+    }
+
+    /* ---- Table ---- */
+    .table-responsive-wrap { max-height: 560px; overflow-y: auto; overflow-x: auto; }
+    .downtime-table { width: 100%; border-collapse: collapse; font-size: .84rem; color: var(--text-main); }
+    .downtime-table thead th {
+        position: sticky; top: 0; z-index: 2;
+        background: var(--sage-bg);
+        color: var(--sage-dark);
+        font-size: .71rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        padding: .8rem .75rem;
+        white-space: nowrap;
+        border-bottom: 2px solid var(--border);
+    }
+    .downtime-table tbody tr { border-bottom: 1px solid #EEF3F0; }
+    .downtime-table tbody tr:hover { background: var(--row-hover); }
+    .downtime-table td { padding: .6rem .75rem; vertical-align: middle; }
+
+    .code-chip {
+        display: inline-block;
+        background: var(--sage-bg);
+        color: var(--sage-dark);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 1px 7px;
+        font-family: 'Courier New', monospace;
+        font-size: .8rem;
+        font-weight: 600;
+    }
+    .id-chip { color: var(--text-muted); font-size: .78rem; }
+    .cell-ellipsis { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .time-chip { font-size: .76rem; color: var(--text-muted); }
+
+    /* ---- State badge ---- */
+    .state-badge {
+        display: inline-block;
+        border-radius: 20px;
+        padding: .18rem .65rem;
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .03em;
+    }
+    .state-open     { background: rgba(245,158,11,.12); color: #92400e; border: 1px solid rgba(245,158,11,.3); }
+    .state-closed   { background: rgba(72,187,120,.12); color: #276749; border: 1px solid rgba(72,187,120,.3); }
+    .state-pending  { background: rgba(99,102,241,.12); color: #3730a3; border: 1px solid rgba(99,102,241,.3); }
+    .state-default  { background: var(--sage-bg); color: var(--sage-dark); border: 1px solid var(--border); }
+
+    /* ---- Action buttons ---- */
+    .btn-act {
+        border-radius: 7px;
+        padding: .28rem .6rem;
+        font-size: .78rem;
+        font-weight: 600;
+        border: 1.5px solid transparent;
+        cursor: pointer;
+        transition: all .18s;
+        line-height: 1;
+    }
+    .btn-act-edit {
+        background: rgba(107,168,138,.14);
+        color: var(--sage-dark);
+        border-color: var(--sage-light);
+    }
+    .btn-act-edit:hover { background: var(--sage); color: #fff; border-color: var(--sage); }
+    .btn-act-del {
+        background: var(--danger-bg);
+        color: var(--danger);
+        border-color: var(--danger-bdr);
+    }
+    .btn-act-del:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+    /* ---- Empty state ---- */
+    .empty-state { text-align: center; padding: 3.5rem 2rem; color: var(--text-muted); }
+    .empty-state .icon { font-size: 2.5rem; opacity: .45; margin-bottom: .8rem; }
+
+    /* ---- Modal ---- */
+    .modal-content { border: none; border-radius: 14px; box-shadow: 0 16px 50px rgba(0,0,0,.18); overflow: hidden; }
+    .mh-edit { background: linear-gradient(135deg, var(--sage-dark), var(--sage)); color: #fff; }
+    .mh-del  { background: linear-gradient(135deg, #c53030, var(--danger)); color: #fff; }
+    .modal-header { border: none; padding: 1rem 1.4rem; }
+    .modal-header .btn-close-white { filter: invert(1) grayscale(1); }
+    .modal-title { font-weight: 700; font-size: 1rem; }
+    .modal-footer { border-top: 1px solid #EDF2EF; padding: .85rem 1.2rem; }
+    .modal-body { padding: 1.2rem 1.4rem; }
+    .modal-body .form-label {
+        font-size: .72rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .05em;
+        color: var(--sage-dark); margin-bottom: .28rem;
+    }
+    .modal-body .form-control,
+    .modal-body .form-select {
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        font-size: .88rem;
+        color: var(--text-main);
+    }
+    .modal-body .form-control:focus,
+    .modal-body .form-select:focus {
+        border-color: var(--sage);
+        box-shadow: 0 0 0 3px rgba(107,168,138,.18);
+    }
+    .modal-body .form-control[readonly] { background: #F7FAFA; color: var(--text-muted); }
+    .del-icon { font-size: 2.8rem; margin-bottom: .6rem; }
+
+    @@media (max-width: 768px) {
+        .page-header { padding: 1rem 1.1rem; }
+        .page-header h2 { font-size: 1.15rem; }
+        .filter-card { padding: .9rem 1rem; }
+        .downtime-table thead th,
+        .downtime-table td { font-size: .76rem; padding: .5rem .5rem; }
+    }
+</style>
+
+<!-- ── Header ── -->
+<div class="page-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h2>🕐 Sửa đổi dữ liệu Downtime</h2>
+            <p>Quản lý và chỉnh sửa bản ghi sự cố dừng máy</p>
+        </div>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert-ok">✅ @TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert-err">❌ @TempData["Error"]</div>
+}
+
+<!-- ── Filter ── -->
+<div class="filter-card">
+    <form method="get" asp-controller="Downtime" asp-action="Modify">
+        <div class="row g-2 align-items-end">
+
+            <div class="col-6 col-sm-4 col-md-2">
+                <span class="filter-label">Từ ngày</span>
+                <input type="date" name="dateFrom" class="form-control" value="@ViewBag.DateFrom" />
+            </div>
+
+            <div class="col-6 col-sm-4 col-md-2">
+                <span class="filter-label">Đến ngày</span>
+                <input type="date" name="dateTo" class="form-control" value="@ViewBag.DateTo" />
+            </div>
+
+            <div class="col-6 col-sm-4 col-md-2">
+                <span class="filter-label">Mã sự cố</span>
+                <input type="text" name="code" class="form-control"
+                       placeholder="VD: DT001" value="@ViewBag.Code" />
+            </div>
+
+            <div class="col-6 col-sm-4 col-md-2">
+                <span class="filter-label">Trạng thái</span>
+                <select name="state" class="form-select">
+                    <option value="">-- Tất cả --</option>
+                    @foreach (var s in stateList)
+                    {
+                        <option value="@s" selected="@(ViewBag.State == s ? "selected" : null)">@s</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-6 col-sm-4 col-md-2">
+                <span class="filter-label">Công đoạn</span>
+                <input type="text" name="operation" class="form-control"
+                       placeholder="VD: POP" value="@ViewBag.Operation" />
+            </div>
+
+            <div class="col-6 col-sm-4 col-md-2">
+                <span class="filter-label">ISS Code</span>
+                <input type="text" name="issCode" class="form-control"
+                       placeholder="VD: ISS-01" value="@ViewBag.IssCode" />
+            </div>
+
+            <div class="col-12 col-sm-4 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn-filter flex-grow-1">🔍 Lọc</button>
+                <a asp-controller="Downtime" asp-action="Modify" class="btn-reset">↺</a>
+            </div>
+
+        </div>
+    </form>
+</div>
+
+<!-- ── Table card ── -->
+<div class="table-card">
+    <div class="table-card-header">
+        <span class="title">📋 Danh sách bản ghi Downtime
+            <span class="tab-badge">@Model.Count</span>
+        </span>
+        <small class="text-muted" style="font-size:.78rem">Hiển thị tối đa 300 bản ghi</small>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <div class="icon">📭</div>
+            <p>Không có dữ liệu — hãy thử điều chỉnh bộ lọc.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive-wrap">
+            <table class="downtime-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Mã SC</th>
+                        <th>Tên sự cố</th>
+                        <th>Trạng thái</th>
+                        <th>Công đoạn</th>
+                        <th>TG ước tính</th>
+                        <th>Mô tả</th>
+                        <th>Thời gian</th>
+                        <th>ISS Code</th>
+                        <th>SVN Code</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Model)
+                    {
+                        <tr>
+                            <td><span class="id-chip">#@r.Id</span></td>
+                            <td><span class="code-chip">@r.Code</span></td>
+                            <td class="cell-ellipsis" title="@r.Name">@r.Name</td>
+                            <td>
+                                @{
+                                    var stateClass = r.State?.ToLower() switch
+                                    {
+                                        "open"    => "state-open",
+                                        "closed"  => "state-closed",
+                                        "pending" => "state-pending",
+                                        _         => "state-default"
+                                    };
+                                }
+                                <span class="state-badge @stateClass">@(r.State ?? "—")</span>
+                            </td>
+                            <td>@r.Operation</td>
+                            <td>@r.EstimateTime</td>
+                            <td class="cell-ellipsis" title="@r.Description">@r.Description</td>
+                            <td><span class="time-chip">@r.Datetime?.ToString("dd/MM/yy HH:mm")</span></td>
+                            <td><span class="code-chip">@r.ISS_Code</span></td>
+                            <td>@r.SVNCode</td>
+                            <td style="white-space:nowrap">
+                                <button class="btn-act btn-act-edit me-1"
+                                    data-id="@r.Id"
+                                    data-code="@r.Code"
+                                    data-name="@r.Name"
+                                    data-state="@r.State"
+                                    data-operation="@r.Operation"
+                                    data-estimatetime="@r.EstimateTime"
+                                    data-description="@r.Description"
+                                    data-datetime="@r.Datetime?.ToString("yyyy-MM-ddTHH:mm")"
+                                    data-isscode="@r.ISS_Code"
+                                    data-svncode="@r.SVNCode"
+                                    onclick="openEditModal(this)">✏️</button>
+                                <button class="btn-act btn-act-del"
+                                    data-id="@r.Id"
+                                    data-label="@r.Code - @r.Name"
+                                    onclick="openDeleteModal(this)">🗑️</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     MODALS
+═══════════════════════════════════════════ -->
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header mh-edit">
+                <span class="modal-title" id="editModalLabel">✏️ Chỉnh sửa bản ghi Downtime</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-controller="Downtime" asp-action="Edit">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="filterDateFrom"  value="@ViewBag.DateFrom" />
+                <input type="hidden" name="filterDateTo"    value="@ViewBag.DateTo" />
+                <input type="hidden" name="filterCode"      value="@ViewBag.Code" />
+                <input type="hidden" name="filterState"     value="@ViewBag.State" />
+                <input type="hidden" name="filterOperation" value="@ViewBag.Operation" />
+                <input type="hidden" name="filterIssCode"   value="@ViewBag.IssCode" />
+                <input type="hidden" id="e_Id" name="Id" />
+
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Mã sự cố</label>
+                            <input type="text" class="form-control" id="e_Code" name="Code" />
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Tên sự cố</label>
+                            <input type="text" class="form-control" id="e_Name" name="Name" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Trạng thái</label>
+                            <select class="form-select" id="e_State" name="State">
+                                <option value="">-- Chọn --</option>
+                                @foreach (var s in stateList)
+                                {
+                                    <option value="@s">@s</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Công đoạn</label>
+                            <input type="text" class="form-control" id="e_Operation" name="Operation" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Thời gian ước tính</label>
+                            <input type="text" class="form-control" id="e_EstimateTime" name="EstimateTime" placeholder="VD: 30 phút" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Mô tả</label>
+                            <input type="text" class="form-control" id="e_Description" name="Description" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Thời gian xảy ra</label>
+                            <input type="datetime-local" class="form-control" id="e_Datetime" name="Datetime" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">ISS Code</label>
+                            <input type="text" class="form-control" id="e_IssCode" name="ISS_Code" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">SVN Code</label>
+                            <input type="text" class="form-control" id="e_SvnCode" name="SVNCode" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-reset" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn-filter ms-2">💾 Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header mh-del">
+                <span class="modal-title">🗑️ Xác nhận xóa</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center" style="padding:2rem 1.5rem">
+                <div class="del-icon">⚠️</div>
+                <p class="fw-semibold mb-1" style="font-size:.97rem">Bạn có chắc muốn xóa bản ghi này?</p>
+                <p class="text-muted mb-1" id="del_label" style="font-size:.87rem"></p>
+                <p style="color:var(--danger);font-size:.83rem;font-weight:600">Hành động này không thể hoàn tác!</p>
+            </div>
+            <form method="post" asp-controller="Downtime" asp-action="Delete">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="filterDateFrom"  value="@ViewBag.DateFrom" />
+                <input type="hidden" name="filterDateTo"    value="@ViewBag.DateTo" />
+                <input type="hidden" name="filterCode"      value="@ViewBag.Code" />
+                <input type="hidden" name="filterState"     value="@ViewBag.State" />
+                <input type="hidden" name="filterOperation" value="@ViewBag.Operation" />
+                <input type="hidden" name="filterIssCode"   value="@ViewBag.IssCode" />
+                <input type="hidden" id="del_id" name="id" />
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn-reset px-4" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-danger px-4 ms-2">🗑️ Xác nhận xóa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+<script>
+function openEditModal(btn) {
+    const d = btn.dataset;
+    document.getElementById('e_Id').value           = d.id           ?? '';
+    document.getElementById('e_Code').value         = d.code         ?? '';
+    document.getElementById('e_Name').value         = d.name         ?? '';
+    document.getElementById('e_Operation').value    = d.operation    ?? '';
+    document.getElementById('e_EstimateTime').value = d.estimatetime ?? '';
+    document.getElementById('e_Description').value  = d.description  ?? '';
+    document.getElementById('e_Datetime').value     = d.datetime     ?? '';
+    document.getElementById('e_IssCode').value      = d.isscode      ?? '';
+    document.getElementById('e_SvnCode').value      = d.svncode      ?? '';
+
+    // Set State dropdown
+    const sel = document.getElementById('e_State');
+    for (let i = 0; i < sel.options.length; i++) {
+        sel.options[i].selected = (sel.options[i].value === (d.state ?? ''));
+    }
+
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+
+function openDeleteModal(btn) {
+    const d = btn.dataset;
+    document.getElementById('del_id').value          = d.id    ?? '';
+    document.getElementById('del_label').textContent = `ID #${d.id}  |  ${d.label ?? ''}`;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
+}

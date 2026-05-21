@@ -13,6 +13,8 @@ namespace DefectModify.Models
         public DbSet<SVN_Defect_Record_History> SVN_Defect_Record_Histories { get; set; }
         public DbSet<DefectEditLog> DefectEditLogs { get; set; }
 
+        public DbSet<SVN_Downtime_Info> SVN_Downtime_Infos { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<SVN_Defect_Record>()
