@@ -1,0 +1,394 @@
+@model List<DefectModify.Models.DefectEditLog>
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Lịch sử thay đổi";
+}
+
+<style>
+    :root {
+        --sage:       #6BA88A;
+        --sage-light: #A8C9B8;
+        --sage-dark:  #3E7A5E;
+        --sage-bg:    #EFF7F3;
+        --cream:      #F7F4EF;
+        --border:     #D4E6DC;
+        --row-hover:  #EBF5F0;
+        --text-main:  #2D3748;
+        --text-muted: #718096;
+        --danger:     #E53E3E;
+        --warning:    #DD6B20;
+        --white:      #FFFFFF;
+    }
+
+    body { background: var(--cream); }
+
+    /* ── Header ── */
+    .log-header {
+        background: linear-gradient(135deg, #2D4A3E 0%, var(--sage-dark) 100%);
+        color: #fff;
+        border-radius: 14px;
+        padding: 1.4rem 1.8rem;
+        margin-bottom: 1.4rem;
+        box-shadow: 0 6px 24px rgba(45,74,62,.25);
+    }
+    .log-header h2 { font-size: 1.45rem; font-weight: 700; margin: 0; }
+    .log-header p  { font-size: .88rem; opacity: .82; margin: .2rem 0 0; }
+
+    /* ── Filter ── */
+    .filter-card {
+        background: var(--white);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.1rem 1.4rem 1rem;
+        margin-bottom: 1.4rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,.05);
+    }
+    .filter-label {
+        font-size: .72rem; font-weight: 700;
+        letter-spacing: .06em; text-transform: uppercase;
+        color: var(--sage-dark); display: block; margin-bottom: .3rem;
+    }
+    .filter-card .form-control,
+    .filter-card .form-select {
+        border: 1.5px solid var(--border); border-radius: 8px;
+        font-size: .88rem; color: var(--text-main); background: #FAFCFB;
+    }
+    .filter-card .form-control:focus,
+    .filter-card .form-select:focus {
+        border-color: var(--sage); box-shadow: 0 0 0 3px rgba(107,168,138,.18); background: #fff;
+    }
+    .btn-filter {
+        background: var(--sage); color: #fff; border: none;
+        border-radius: 9px; padding: .48rem 1.2rem;
+        font-weight: 600; font-size: .88rem; transition: background .2s;
+    }
+    .btn-filter:hover { background: var(--sage-dark); color: #fff; }
+    .btn-reset {
+        background: #fff; color: var(--text-muted);
+        border: 1.5px solid #CBD5E0; border-radius: 9px;
+        padding: .48rem .9rem; font-size: .88rem; font-weight: 600;
+        transition: all .2s; text-decoration: none;
+    }
+    .btn-reset:hover { background: #F7FAFC; color: var(--text-main); }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+        display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.2rem;
+    }
+    .stat-pill {
+        background: var(--white);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: .55rem 1rem;
+        display: flex; flex-direction: column; align-items: center;
+        box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        min-width: 100px;
+    }
+    .stat-pill .num  { font-size: 1.3rem; font-weight: 700; color: var(--sage-dark); line-height: 1; }
+    .stat-pill .lbl  { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-top: .15rem; }
+
+    /* ── Table card ── */
+    .table-card {
+        background: var(--white);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,.06);
+        overflow: hidden;
+    }
+    .table-card-header {
+        padding: .85rem 1.2rem;
+        border-bottom: 1px solid var(--border);
+        font-weight: 700;
+        font-size: .9rem;
+        color: var(--sage-dark);
+        background: var(--sage-bg);
+    }
+    .table-responsive-wrap { max-height: 580px; overflow-y: auto; overflow-x: auto; }
+
+    .log-table { width: 100%; border-collapse: collapse; font-size: .84rem; color: var(--text-main); }
+    .log-table thead th {
+        position: sticky; top: 0; z-index: 2;
+        background: #F0F7F4;
+        color: var(--sage-dark);
+        font-size: .7rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .06em;
+        padding: .8rem .75rem; white-space: nowrap;
+        border-bottom: 2px solid var(--border);
+    }
+    .log-table tbody tr { border-bottom: 1px solid #EEF3F0; }
+    .log-table tbody tr:hover { background: var(--row-hover); }
+    .log-table td { padding: .65rem .75rem; vertical-align: top; }
+
+    /* Badges */
+    .badge-action {
+        display: inline-block;
+        border-radius: 6px;
+        padding: .2rem .6rem;
+        font-size: .72rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .04em;
+    }
+    .badge-edit   { background: rgba(107,168,138,.15); color: var(--sage-dark); border: 1px solid var(--sage-light); }
+    .badge-delete { background: rgba(229,62,62,.1);    color: var(--danger);    border: 1px solid rgba(229,62,62,.25); }
+
+    .badge-table {
+        display: inline-block;
+        background: #EDF2FF; color: #3730A3;
+        border: 1px solid #C7D2FE;
+        border-radius: 6px; padding: .15rem .55rem;
+        font-size: .72rem; font-weight: 600;
+    }
+
+    /* JSON diff block */
+    .diff-block {
+        font-size: .76rem; font-family: 'Courier New', monospace;
+        background: #F8FAFB; border: 1px solid #E2E8F0;
+        border-radius: 6px; padding: .5rem .7rem;
+        max-width: 260px; max-height: 80px;
+        overflow: auto; white-space: pre-wrap; word-break: break-all;
+        color: #4A5568; line-height: 1.4;
+    }
+
+    .time-txt { font-size: .8rem; color: var(--text-muted); white-space: nowrap; }
+    .record-id { font-size: .78rem; color: var(--text-muted); font-family: monospace; }
+
+    /* Detail modal */
+    .modal-content { border: none; border-radius: 14px; box-shadow: 0 16px 50px rgba(0,0,0,.18); overflow: hidden; }
+    .mh-log  { background: linear-gradient(135deg, #2D4A3E, var(--sage-dark)); color: #fff; }
+    .modal-header { border: none; padding: 1rem 1.4rem; }
+    .modal-title { font-weight: 700; font-size: 1rem; }
+    .modal-footer { border-top: 1px solid #EDF2EF; }
+    .json-block {
+        background: #1A202C; color: #A0F0C4;
+        border-radius: 8px; padding: .9rem 1rem;
+        font-family: 'Courier New', monospace;
+        font-size: .8rem; line-height: 1.6;
+        white-space: pre-wrap; word-break: break-all;
+        max-height: 260px; overflow: auto;
+    }
+    .sec-label {
+        font-size: .72rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .06em; color: var(--sage-dark); margin-bottom: .4rem;
+    }
+
+    .empty-state { text-align: center; padding: 3.5rem 2rem; color: var(--text-muted); }
+    .empty-state .icon { font-size: 2.5rem; opacity: .4; margin-bottom: .8rem; }
+
+    @@media (max-width: 768px) {
+        .log-header { padding: 1rem 1.1rem; }
+        .log-header h2 { font-size: 1.15rem; }
+        .log-table thead th, .log-table td { font-size: .76rem; padding: .5rem .5rem; }
+        .diff-block { max-width: 160px; }
+    }
+</style>
+
+<!-- ── Header ── -->
+<div class="log-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h2>📋 Lịch sử thay đổi</h2>
+            <p>Theo dõi toàn bộ thao tác Sửa / Xóa được thực hiện qua ứng dụng</p>
+        </div>
+        <a asp-controller="Defect" asp-action="Modify" class="btn btn-light btn-sm fw-semibold">
+            ← Quay lại Sửa đổi
+        </a>
+    </div>
+</div>
+
+<!-- ── Filter ── -->
+<div class="filter-card">
+    <form method="get" asp-controller="Defect" asp-action="Log">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-sm-3 col-md-2">
+                <span class="filter-label">Từ ngày</span>
+                <input type="date" name="dateFrom" class="form-control" value="@ViewBag.DateFrom" />
+            </div>
+            <div class="col-6 col-sm-3 col-md-2">
+                <span class="filter-label">Đến ngày</span>
+                <input type="date" name="dateTo" class="form-control" value="@ViewBag.DateTo" />
+            </div>
+            <div class="col-6 col-sm-3 col-md-2">
+                <span class="filter-label">Loại thao tác</span>
+                <select name="action" class="form-select">
+                    <option value="">Tất cả</option>
+                    <option value="Edit"   selected="@(ViewBag.Action == "Edit"   ? "selected" : null)">✏️ Sửa</option>
+                    <option value="Delete" selected="@(ViewBag.Action == "Delete" ? "selected" : null)">🗑️ Xóa</option>
+                </select>
+            </div>
+            <div class="col-6 col-sm-3 col-md-3">
+                <span class="filter-label">Bảng dữ liệu</span>
+                <select name="tableName" class="form-select">
+                    <option value="">Tất cả</option>
+                    <option value="SVN_Defect_Record_History" selected="@(ViewBag.TableName == "SVN_Defect_Record_History" ? "selected" : null)">Lịch sử lỗi</option>
+                    <option value="SVN_Defect_Record"         selected="@(ViewBag.TableName == "SVN_Defect_Record"         ? "selected" : null)">Bản ghi lỗi</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn-filter flex-grow-1">🔍 Lọc</button>
+                <a asp-controller="Defect" asp-action="Log" class="btn-reset">↺</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- ── Stats ── -->
+@{
+    var totalEdit   = Model.Count(l => l.Action == "Edit");
+    var totalDelete = Model.Count(l => l.Action == "Delete");
+    var totalHist   = Model.Count(l => l.TableName == "SVN_Defect_Record_History");
+    var totalRec    = Model.Count(l => l.TableName == "SVN_Defect_Record");
+}
+<div class="stats-bar">
+    <div class="stat-pill">
+        <span class="num">@Model.Count</span>
+        <span class="lbl">Tổng thao tác</span>
+    </div>
+    <div class="stat-pill">
+        <span class="num" style="color:var(--sage-dark)">@totalEdit</span>
+        <span class="lbl">Lần sửa</span>
+    </div>
+    <div class="stat-pill">
+        <span class="num" style="color:var(--danger)">@totalDelete</span>
+        <span class="lbl">Lần xóa</span>
+    </div>
+    <div class="stat-pill">
+        <span class="num" style="color:#3730A3">@totalHist</span>
+        <span class="lbl">Lịch sử lỗi</span>
+    </div>
+    <div class="stat-pill">
+        <span class="num" style="color:var(--warning)">@totalRec</span>
+        <span class="lbl">Bản ghi lỗi</span>
+    </div>
+</div>
+
+<!-- ── Table ── -->
+<div class="table-card">
+    <div class="table-card-header">
+        📋 Nhật ký thay đổi
+        <span style="font-size:.8rem;font-weight:400;color:var(--text-muted);margin-left:.5rem">Hiển thị tối đa 500 bản ghi gần nhất</span>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state"><div class="icon">📭</div><p>Chưa có lịch sử thay đổi nào được ghi nhận.</p></div>
+    }
+    else
+    {
+        <div class="table-responsive-wrap">
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Thời gian</th>
+                        <th>Thao tác</th>
+                        <th>Bảng</th>
+                        <th>ID / Định danh</th>
+                        <th>Giá trị cũ</th>
+                        <th>Giá trị mới</th>
+                        <th>Chi tiết</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var log in Model)
+                    {
+                        <tr>
+                            <td class="record-id">#@log.Id</td>
+                            <td><span class="time-txt">@log.ModifiedAt.ToString("dd/MM/yyyy")<br/>@log.ModifiedAt.ToString("HH:mm:ss")</span></td>
+                            <td>
+                                @if (log.Action == "Delete")
+                                {
+                                    <span class="badge-action badge-delete">🗑️ Xóa</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-action badge-edit">✏️ Sửa</span>
+                                }
+                            </td>
+                            <td><span class="badge-table">@(log.TableName == "SVN_Defect_Record_History" ? "Lịch sử lỗi" : "Bản ghi lỗi")</span></td>
+                            <td class="record-id">@log.RecordId</td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(log.OldValues))
+                                {
+                                    <div class="diff-block">@log.OldValues</div>
+                                }
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(log.NewValues))
+                                {
+                                    <div class="diff-block" style="color:#276749">@log.NewValues</div>
+                                }
+                                else
+                                {
+                                    <span style="font-size:.78rem;color:var(--text-muted)">—</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-sm"
+                                    style="background:var(--sage-bg);color:var(--sage-dark);border:1px solid var(--border);border-radius:6px;font-size:.76rem;font-weight:600"
+                                    data-old="@log.OldValues"
+                                    data-new="@log.NewValues"
+                                    data-action="@log.Action"
+                                    data-table="@log.TableName"
+                                    data-record="@log.RecordId"
+                                    data-time="@log.ModifiedAt.ToString("dd/MM/yyyy HH:mm:ss")"
+                                    onclick="openDetail(this)">🔍 Xem</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Detail Modal -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header mh-log">
+                <span class="modal-title" id="detail_title">🔍 Chi tiết thay đổi</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding:1.4rem">
+                <div class="row g-2 mb-3">
+                    <div class="col-4"><span class="sec-label">Thao tác</span><br/><span id="dm_action"></span></div>
+                    <div class="col-4"><span class="sec-label">Bảng</span><br/><span id="dm_table" class="badge-table"></span></div>
+                    <div class="col-4"><span class="sec-label">Thời gian</span><br/><span id="dm_time" class="time-txt"></span></div>
+                </div>
+                <div class="mb-1"><span class="sec-label">Định danh bản ghi</span></div>
+                <div class="json-block mb-3" id="dm_record" style="max-height:60px;background:#2D3748;color:#CBD5E0"></div>
+                <div class="mb-1"><span class="sec-label">Giá trị cũ (trước khi thay đổi)</span></div>
+                <div class="json-block mb-3" id="dm_old"></div>
+                <div class="mb-1"><span class="sec-label">Giá trị mới (sau khi thay đổi)</span></div>
+                <div class="json-block" id="dm_new" style="color:#A0F0C4"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function prettyJson(str) {
+    if (!str) return '(Không có dữ liệu)';
+    try { return JSON.stringify(JSON.parse(str), null, 2); }
+    catch { return str; }
+}
+
+function openDetail(btn) {
+    const d = btn.dataset;
+    document.getElementById('dm_action').innerHTML =
+        d.action === 'Delete'
+            ? '<span class="badge-action badge-delete">🗑️ Xóa</span>'
+            : '<span class="badge-action badge-edit">✏️ Sửa</span>';
+    document.getElementById('dm_table').textContent =
+        d.table === 'SVN_Defect_Record_History' ? 'Lịch sử lỗi' : 'Bản ghi lỗi';
+    document.getElementById('dm_time').textContent   = d.time;
+    document.getElementById('dm_record').textContent = d.record;
+    document.getElementById('dm_old').textContent    = prettyJson(d.old);
+    document.getElementById('dm_new').textContent    = d.action === 'Delete' ? '(Bản ghi đã bị xóa)' : prettyJson(d.new);
+    new bootstrap.Modal(document.getElementById('detailModal')).show();
+}
+</script>
+}

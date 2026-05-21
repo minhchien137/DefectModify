@@ -1,0 +1,676 @@
+@model DefectModify.Models.DefectModifyViewModel
+@{
+    ViewData["Title"] = "Sửa đổi dữ liệu lỗi";
+    var activeTab = (string)(ViewBag.ActiveTable ?? "history");
+}
+
+<style>
+    :root {
+        --sage:        #6BA88A;
+        --sage-light:  #A8C9B8;
+        --sage-dark:   #3E7A5E;
+        --sage-bg:     #EFF7F3;
+        --cream:       #F7F4EF;
+        --border:      #D4E6DC;
+        --row-hover:   #EBF5F0;
+        --text-main:   #2D3748;
+        --text-muted:  #718096;
+        --danger:      #E53E3E;
+        --danger-bg:   rgba(229,62,62,.08);
+        --danger-bdr:  rgba(229,62,62,.28);
+        --white:       #FFFFFF;
+    }
+
+    /* ---- Layout ---- */
+    body { background: var(--cream); }
+
+    .page-header {
+        background: linear-gradient(135deg, var(--sage-dark) 0%, var(--sage) 100%);
+        color: #fff;
+        border-radius: 14px;
+        padding: 1.4rem 1.8rem;
+        margin-bottom: 1.4rem;
+        box-shadow: 0 6px 24px rgba(62,122,94,.22);
+    }
+    .page-header h2  { font-size: 1.45rem; font-weight: 700; margin: 0; }
+    .page-header p   { font-size: .88rem; opacity: .82; margin: .2rem 0 0; }
+
+    /* ---- Filter card ---- */
+    .filter-card {
+        background: var(--white);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.1rem 1.4rem 1rem;
+        margin-bottom: 1.4rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,.05);
+    }
+    .filter-card .filter-label {
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--sage-dark);
+        display: block;
+        margin-bottom: .3rem;
+    }
+    .filter-card .form-control,
+    .filter-card .form-select {
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        font-size: .88rem;
+        color: var(--text-main);
+        background: #FAFCFB;
+    }
+    .filter-card .form-control:focus,
+    .filter-card .form-select:focus {
+        border-color: var(--sage);
+        box-shadow: 0 0 0 3px rgba(107,168,138,.18);
+        background: #fff;
+    }
+    .btn-filter {
+        background: var(--sage);
+        color: #fff;
+        border: none;
+        border-radius: 9px;
+        padding: .48rem 1.2rem;
+        font-weight: 600;
+        font-size: .88rem;
+        transition: background .2s;
+    }
+    .btn-filter:hover { background: var(--sage-dark); color: #fff; }
+    .btn-reset {
+        background: #fff;
+        color: var(--text-muted);
+        border: 1.5px solid #CBD5E0;
+        border-radius: 9px;
+        padding: .48rem .9rem;
+        font-size: .88rem;
+        font-weight: 600;
+        transition: all .2s;
+        text-decoration: none;
+    }
+    .btn-reset:hover { background: #F7FAFC; color: var(--text-main); }
+
+    /* ---- Alert banners ---- */
+    .alert-ok {
+        background: rgba(72,187,120,.1);
+        border: 1px solid rgba(72,187,120,.3);
+        color: #276749;
+        border-radius: 10px;
+        padding: .75rem 1rem .75rem 1.1rem;
+        margin-bottom: 1rem;
+        font-size: .9rem;
+    }
+    .alert-err {
+        background: rgba(229,62,62,.08);
+        border: 1px solid rgba(229,62,62,.3);
+        color: #c53030;
+        border-radius: 10px;
+        padding: .75rem 1rem;
+        margin-bottom: 1rem;
+        font-size: .9rem;
+    }
+
+    /* ---- Table card ---- */
+    .table-card {
+        background: var(--white);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,.06);
+        overflow: hidden;
+    }
+
+    /* ---- Custom tabs ---- */
+    .custom-tabs { display: flex; padding: .6rem 1rem 0; border-bottom: 2px solid var(--border); gap: 4px; }
+    .custom-tab {
+        padding: .6rem 1.1rem;
+        font-size: .875rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        border: none;
+        background: transparent;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        cursor: pointer;
+        border-radius: 8px 8px 0 0;
+        transition: color .15s, background .15s;
+        text-decoration: none;
+    }
+    .custom-tab:hover { color: var(--sage-dark); background: var(--sage-bg); }
+    .custom-tab.active { color: var(--sage-dark); border-bottom-color: var(--sage); background: var(--sage-bg); }
+    .tab-badge {
+        display: inline-block;
+        background: var(--sage);
+        color: #fff;
+        font-size: .68rem;
+        border-radius: 10px;
+        padding: .1rem .45rem;
+        margin-left: .35rem;
+        font-weight: 700;
+    }
+
+    /* ---- Table ---- */
+    .table-responsive-wrap { max-height: 520px; overflow-y: auto; overflow-x: auto; }
+    .defect-table { width: 100%; border-collapse: collapse; font-size: .84rem; color: var(--text-main); }
+    .defect-table thead th {
+        position: sticky; top: 0; z-index: 2;
+        background: var(--sage-bg);
+        color: var(--sage-dark);
+        font-size: .71rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        padding: .8rem .75rem;
+        white-space: nowrap;
+        border-bottom: 2px solid var(--border);
+    }
+    .defect-table tbody tr { border-bottom: 1px solid #EEF3F0; }
+    .defect-table tbody tr:hover { background: var(--row-hover); }
+    .defect-table td { padding: .6rem .75rem; vertical-align: middle; }
+
+    .code-chip {
+        display: inline-block;
+        background: var(--sage-bg);
+        color: var(--sage-dark);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 1px 7px;
+        font-family: 'Courier New', monospace;
+        font-size: .8rem;
+        font-weight: 600;
+    }
+    .id-chip { color: var(--text-muted); font-size: .78rem; }
+    .cell-ellipsis { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .time-chip { font-size: .76rem; color: var(--text-muted); }
+
+    /* ---- Action buttons ---- */
+    .btn-act {
+        border-radius: 7px;
+        padding: .28rem .6rem;
+        font-size: .78rem;
+        font-weight: 600;
+        border: 1.5px solid transparent;
+        cursor: pointer;
+        transition: all .18s;
+        line-height: 1;
+    }
+    .btn-act-edit {
+        background: rgba(107,168,138,.14);
+        color: var(--sage-dark);
+        border-color: var(--sage-light);
+    }
+    .btn-act-edit:hover { background: var(--sage); color: #fff; border-color: var(--sage); }
+    .btn-act-del  {
+        background: var(--danger-bg);
+        color: var(--danger);
+        border-color: var(--danger-bdr);
+    }
+    .btn-act-del:hover  { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+    /* ---- Empty state ---- */
+    .empty-state { text-align: center; padding: 3.5rem 2rem; color: var(--text-muted); }
+    .empty-state .icon { font-size: 2.5rem; opacity: .45; margin-bottom: .8rem; }
+
+    /* ---- Modal ---- */
+    .modal-content { border: none; border-radius: 14px; box-shadow: 0 16px 50px rgba(0,0,0,.18); overflow: hidden; }
+    .mh-edit  { background: linear-gradient(135deg, var(--sage-dark), var(--sage)); color: #fff; }
+    .mh-del   { background: linear-gradient(135deg, #c53030, var(--danger)); color: #fff; }
+    .modal-header { border: none; padding: 1rem 1.4rem; }
+    .modal-header .btn-close-white { filter: invert(1) grayscale(1); }
+    .modal-title { font-weight: 700; font-size: 1rem; }
+    .modal-footer { border-top: 1px solid #EDF2EF; padding: .85rem 1.2rem; }
+    .modal-body { padding: 1.2rem 1.4rem; }
+    .modal-body .form-label {
+        font-size: .72rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .05em;
+        color: var(--sage-dark); margin-bottom: .28rem;
+    }
+    .modal-body .form-control {
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        font-size: .88rem;
+        color: var(--text-main);
+    }
+    .modal-body .form-control:focus {
+        border-color: var(--sage);
+        box-shadow: 0 0 0 3px rgba(107,168,138,.18);
+    }
+    .modal-body .form-control[readonly] { background: #F7FAFA; color: var(--text-muted); }
+    .del-icon { font-size: 2.8rem; margin-bottom: .6rem; }
+
+    /* ---- Responsive ---- */
+    @@media (max-width: 768px) {
+        .page-header { padding: 1rem 1.1rem; }
+        .page-header h2 { font-size: 1.15rem; }
+        .filter-card { padding: .9rem 1rem; }
+        .custom-tab { padding: .5rem .7rem; font-size: .8rem; }
+        .defect-table thead th,
+        .defect-table td { font-size: .76rem; padding: .5rem .5rem; }
+    }
+</style>
+
+<!-- ── Header ── -->
+<div class="page-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h2>⚙️ Sửa đổi dữ liệu lỗi</h2>
+            <p>Quản lý và chỉnh sửa bản ghi lỗi sản xuất</p>
+        </div>
+        <a asp-controller="Defect" asp-action="Log"
+           class="btn btn-light btn-sm fw-semibold d-flex align-items-center gap-1">
+            📋 Lịch sử thay đổi
+        </a>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert-ok">✅ @TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert-err">❌ @TempData["Error"]</div>
+}
+
+<!-- ── Filter ── -->
+<div class="filter-card">
+    <form method="get" asp-controller="Defect" asp-action="Modify">
+        <input type="hidden" name="table" value="@activeTab" />
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-sm-4 col-md-2">
+                <span class="filter-label">Từ ngày</span>
+                <input type="date" name="dateFrom" class="form-control" value="@ViewBag.DateFrom" />
+            </div>
+            <div class="col-6 col-sm-4 col-md-2">
+                <span class="filter-label">Đến ngày</span>
+                <input type="date" name="dateTo" class="form-control" value="@ViewBag.DateTo" />
+            </div>
+            <div class="col-6 col-sm-4 col-md-2">
+                <span class="filter-label">Mã sản phẩm</span>
+                <input type="text" name="itemCode" class="form-control" placeholder="VD: FW800111" value="@ViewBag.ItemCode" />
+            </div>
+            <div class="col-6 col-sm-4 col-md-2">
+                <span class="filter-label">Công đoạn</span>
+                <input type="text" name="operation" class="form-control" placeholder="VD: POP" value="@ViewBag.Operation" />
+            </div>
+            <div class="col-12 col-sm-4 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn-filter flex-grow-1">🔍 Lọc</button>
+                <a asp-controller="Defect" asp-action="Modify" class="btn-reset">↺</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- ── Table card ── -->
+<div class="table-card">
+
+    <!-- Tabs -->
+    <div class="custom-tabs">
+        <a class="custom-tab @(activeTab == "history" ? "active" : "")"
+           href="@Url.Action("Modify","Defect", new{ dateFrom=ViewBag.DateFrom, dateTo=ViewBag.DateTo, itemCode=ViewBag.ItemCode, operation=ViewBag.Operation, table="history" })">
+            📂 Lịch sử lỗi <span class="tab-badge">@Model.HistoryRecords.Count</span>
+        </a>
+        <a class="custom-tab @(activeTab == "record" ? "active" : "")"
+           href="@Url.Action("Modify","Defect", new{ dateFrom=ViewBag.DateFrom, dateTo=ViewBag.DateTo, itemCode=ViewBag.ItemCode, operation=ViewBag.Operation, table="record" })">
+            📋 Bản ghi lỗi <span class="tab-badge">@Model.DefectRecords.Count</span>
+        </a>
+    </div>
+
+    <!-- ======= Tab: History ======= -->
+    @if (activeTab == "history")
+    {
+        if (!Model.HistoryRecords.Any())
+        {
+            <div class="empty-state"><div class="icon">📭</div><p>Không có dữ liệu — hãy thử điều chỉnh bộ lọc.</p></div>
+        }
+        else
+        {
+            <div class="table-responsive-wrap">
+                <table class="defect-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th><th>Work Order</th><th>Mã SP</th>
+                            <th>Mã lỗi</th><th>Tên lỗi</th><th>SL NG</th>
+                            <th>Ngày</th><th>Công đoạn</th>
+                            <th>Mã NV</th><th>Tên NV</th>
+                            <th>Ghi chú</th><th>Cập nhật lúc</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.HistoryRecords)
+                        {
+                            <tr>
+                                <td><span class="id-chip">#@r.Id</span></td>
+                                <td>@r.Work_order</td>
+                                <td><strong>@r.Item_code</strong></td>
+                                <td><span class="code-chip">@r.Defect_Code</span></td>
+                                <td>@r.Defect_Name</td>
+                                <td>@r.Qty_NG</td>
+                                <td>@r.INSDatetime</td>
+                                <td>@r.Operation</td>
+                                <td>@r.Employer_code</td>
+                                <td>@r.Employer_name</td>
+                                <td class="cell-ellipsis" title="@r.Note">@r.Note</td>
+                                <td><span class="time-chip">@r.Time_line?.ToString("dd/MM/yy HH:mm")</span></td>
+                                <td>
+                                    <button class="btn-act btn-act-edit me-1"
+                                        data-id="@r.Id"
+                                        data-workorder="@r.Work_order"
+                                        data-itemcode="@r.Item_code"
+                                        data-defectcode="@r.Defect_Code"
+                                        data-defectname="@r.Defect_Name"
+                                        data-qtyng="@r.Qty_NG"
+                                        data-ins="@r.INSDatetime"
+                                        data-op="@r.Operation"
+                                        data-empcode="@r.Employer_code"
+                                        data-empname="@r.Employer_name"
+                                        data-note="@r.Note"
+                                        onclick="openEditHistory(this)">✏️</button>
+                                    <button class="btn-act btn-act-del"
+                                        data-id="@r.Id"
+                                        data-label="@r.Item_code / @r.Defect_Code"
+                                        onclick="openDeleteHistory(this)">🗑️</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+
+    <!-- ======= Tab: Record ======= -->
+    @if (activeTab == "record")
+    {
+        if (!Model.DefectRecords.Any())
+        {
+            <div class="empty-state"><div class="icon">📭</div><p>Không có dữ liệu — hãy thử điều chỉnh bộ lọc.</p></div>
+        }
+        else
+        {
+            <div class="table-responsive-wrap">
+                <table class="defect-table">
+                    <thead>
+                        <tr>
+                            <th>Mã SP</th><th>Mã lỗi</th><th>SL NG</th>
+                            <th>Ngày</th><th>Công đoạn</th>
+                            <th>Mã NV</th><th>Tên NV</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.DefectRecords)
+                        {
+                            <tr>
+                                <td><strong>@r.Item_code</strong></td>
+                                <td><span class="code-chip">@r.Defect_Code</span></td>
+                                <td>@r.Qty_NG</td>
+                                <td>@r.INSDatetime</td>
+                                <td>@r.Operation</td>
+                                <td>@r.Employer_code</td>
+                                <td>@r.Employer_name</td>
+                                <td>
+                                    <button class="btn-act btn-act-edit me-1"
+                                        data-itemcode="@r.Item_code"
+                                        data-defectcode="@r.Defect_Code"
+                                        data-qtyng="@r.Qty_NG"
+                                        data-ins="@r.INSDatetime"
+                                        data-op="@r.Operation"
+                                        data-empcode="@r.Employer_code"
+                                        data-empname="@r.Employer_name"
+                                        onclick="openEditRecord(this)">✏️</button>
+                                    <button class="btn-act btn-act-del"
+                                        data-itemcode="@r.Item_code"
+                                        data-defectcode="@r.Defect_Code"
+                                        data-ins="@r.INSDatetime"
+                                        data-op="@r.Operation"
+                                        data-label="@r.Item_code / @r.Defect_Code"
+                                        onclick="openDeleteRecord(this)">🗑️</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     MODALS
+═══════════════════════════════════════════ -->
+
+<!-- Edit History Modal -->
+<div class="modal fade" id="editHistoryModal" tabindex="-1" aria-labelledby="editHistoryLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header mh-edit">
+                <span class="modal-title" id="editHistoryLabel">✏️ Chỉnh sửa Lịch sử lỗi</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-controller="Defect" asp-action="EditHistory">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <input type="hidden" id="eh_Id" name="Id" />
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Work Order</label>
+                            <input type="text" class="form-control" id="eh_WorkOrder" name="Work_order" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Mã sản phẩm</label>
+                            <input type="text" class="form-control" id="eh_ItemCode" name="Item_code" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Mã lỗi</label>
+                            <input type="text" class="form-control" id="eh_DefectCode" name="Defect_Code" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Tên lỗi</label>
+                            <input type="text" class="form-control" id="eh_DefectName" name="Defect_Name" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Số lượng NG</label>
+                            <input type="number" class="form-control" id="eh_QtyNG" name="Qty_NG" min="0" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Ngày (YYYYMMDD)</label>
+                            <input type="text" class="form-control" id="eh_INS" name="INSDatetime" maxlength="8" placeholder="20250425" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Công đoạn</label>
+                            <input type="text" class="form-control" id="eh_Op" name="Operation" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Mã nhân viên</label>
+                            <input type="text" class="form-control" id="eh_EmpCode" name="Employer_code" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Tên nhân viên</label>
+                            <input type="text" class="form-control" id="eh_EmpName" name="Employer_name" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ghi chú</label>
+                            <input type="text" class="form-control" id="eh_Note" name="Note" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-reset" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn-filter ms-2">💾 Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete History Modal -->
+<div class="modal fade" id="deleteHistoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header mh-del">
+                <span class="modal-title">🗑️ Xác nhận xóa</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center" style="padding:2rem 1.5rem">
+                <div class="del-icon">⚠️</div>
+                <p class="fw-semibold mb-1" style="font-size:.97rem">Bạn có chắc muốn xóa bản ghi này?</p>
+                <p class="text-muted mb-1" id="dh_label" style="font-size:.87rem"></p>
+                <p style="color:var(--danger);font-size:.83rem;font-weight:600">Hành động này không thể hoàn tác!</p>
+            </div>
+            <form method="post" asp-controller="Defect" asp-action="DeleteHistory">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="dh_id" name="id" />
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn-reset px-4" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-danger px-4 ms-2">🗑️ Xác nhận xóa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Record Modal -->
+<div class="modal fade" id="editRecordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header mh-edit">
+                <span class="modal-title">✏️ Chỉnh sửa Bản ghi lỗi</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-controller="Defect" asp-action="EditRecord">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="er_origItemCode"    name="origItemCode" />
+                <input type="hidden" id="er_origDefectCode"  name="origDefectCode" />
+                <input type="hidden" id="er_origIns"         name="origInsDatetime" />
+                <input type="hidden" id="er_origOp"          name="origOperation" />
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label">Mã sản phẩm <small>(khóa)</small></label>
+                            <input type="text" class="form-control" id="er_ItemCode" name="Item_code" readonly />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Mã lỗi <small>(khóa)</small></label>
+                            <input type="text" class="form-control" id="er_DefectCode" name="Defect_Code" readonly />
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Số lượng NG</label>
+                            <input type="text" class="form-control" id="er_QtyNG" name="Qty_NG" />
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Ngày <small>(khóa)</small></label>
+                            <input type="text" class="form-control" id="er_Ins" name="INSDatetime" readonly />
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Công đoạn <small>(khóa)</small></label>
+                            <input type="text" class="form-control" id="er_Op" name="Operation" readonly />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Mã nhân viên</label>
+                            <input type="text" class="form-control" id="er_EmpCode" name="Employer_code" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Tên nhân viên</label>
+                            <input type="text" class="form-control" id="er_EmpName" name="Employer_name" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-reset" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn-filter ms-2">💾 Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Record Modal -->
+<div class="modal fade" id="deleteRecordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header mh-del">
+                <span class="modal-title">🗑️ Xác nhận xóa</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center" style="padding:2rem 1.5rem">
+                <div class="del-icon">⚠️</div>
+                <p class="fw-semibold mb-1" style="font-size:.97rem">Bạn có chắc muốn xóa bản ghi này?</p>
+                <p class="text-muted mb-1" id="dr_label" style="font-size:.87rem"></p>
+                <p style="color:var(--danger);font-size:.83rem;font-weight:600">Hành động này không thể hoàn tác!</p>
+            </div>
+            <form method="post" asp-controller="Defect" asp-action="DeleteRecord">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="dr_itemCode"   name="itemCode" />
+                <input type="hidden" id="dr_defectCode" name="defectCode" />
+                <input type="hidden" id="dr_ins"        name="insDatetime" />
+                <input type="hidden" id="dr_op"         name="operation" />
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn-reset px-4" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-danger px-4 ms-2">🗑️ Xác nhận xóa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+<script>
+// ── Edit History ──
+function openEditHistory(btn) {
+    const d = btn.dataset;
+    document.getElementById('eh_Id').value       = d.id;
+    document.getElementById('eh_WorkOrder').value = d.workorder ?? '';
+    document.getElementById('eh_ItemCode').value  = d.itemcode  ?? '';
+    document.getElementById('eh_DefectCode').value= d.defectcode?? '';
+    document.getElementById('eh_DefectName').value= d.defectname?? '';
+    document.getElementById('eh_QtyNG').value     = d.qtyng     ?? '';
+    document.getElementById('eh_INS').value       = d.ins       ?? '';
+    document.getElementById('eh_Op').value        = d.op        ?? '';
+    document.getElementById('eh_EmpCode').value   = d.empcode   ?? '';
+    document.getElementById('eh_EmpName').value   = d.empname   ?? '';
+    document.getElementById('eh_Note').value      = d.note      ?? '';
+    new bootstrap.Modal(document.getElementById('editHistoryModal')).show();
+}
+
+// ── Delete History ──
+function openDeleteHistory(btn) {
+    const d = btn.dataset;
+    document.getElementById('dh_id').value    = d.id;
+    document.getElementById('dh_label').textContent = `ID #${d.id}  |  ${d.label}`;
+    new bootstrap.Modal(document.getElementById('deleteHistoryModal')).show();
+}
+
+// ── Edit Record ──
+function openEditRecord(btn) {
+    const d = btn.dataset;
+    document.getElementById('er_origItemCode').value   = d.itemcode  ?? '';
+    document.getElementById('er_origDefectCode').value = d.defectcode ?? '';
+    document.getElementById('er_origIns').value        = d.ins        ?? '';
+    document.getElementById('er_origOp').value         = d.op         ?? '';
+    document.getElementById('er_ItemCode').value       = d.itemcode   ?? '';
+    document.getElementById('er_DefectCode').value     = d.defectcode ?? '';
+    document.getElementById('er_QtyNG').value          = d.qtyng      ?? '';
+    document.getElementById('er_Ins').value            = d.ins        ?? '';
+    document.getElementById('er_Op').value             = d.op         ?? '';
+    document.getElementById('er_EmpCode').value        = d.empcode    ?? '';
+    document.getElementById('er_EmpName').value        = d.empname    ?? '';
+    new bootstrap.Modal(document.getElementById('editRecordModal')).show();
+}
+
+// ── Delete Record ──
+function openDeleteRecord(btn) {
+    const d = btn.dataset;
+    document.getElementById('dr_itemCode').value   = d.itemcode   ?? '';
+    document.getElementById('dr_defectCode').value = d.defectcode ?? '';
+    document.getElementById('dr_ins').value        = d.ins        ?? '';
+    document.getElementById('dr_op').value         = d.op         ?? '';
+    document.getElementById('dr_label').textContent =
+        `${d.label}  |  Ngày: ${d.ins}  |  Công đoạn: ${d.op}`;
+    new bootstrap.Modal(document.getElementById('deleteRecordModal')).show();
+}
+</script>
+}
