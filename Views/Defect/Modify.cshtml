@@ -452,6 +452,10 @@
             </div>
             <form method="post" asp-controller="Defect" asp-action="EditHistory">
                 @Html.AntiForgeryToken()
+                <input type="hidden" name="filterDateFrom"  value="@ViewBag.DateFrom" />
+                <input type="hidden" name="filterDateTo"    value="@ViewBag.DateTo" />
+                <input type="hidden" name="filterItemCode"  value="@ViewBag.ItemCode" />
+                <input type="hidden" name="filterOperation" value="@ViewBag.Operation" />
                 <div class="modal-body">
                     <input type="hidden" id="eh_Id" name="Id" />
                     <div class="row g-3">
@@ -522,6 +526,10 @@
             </div>
             <form method="post" asp-controller="Defect" asp-action="DeleteHistory">
                 @Html.AntiForgeryToken()
+                <input type="hidden" name="filterDateFrom"  value="@ViewBag.DateFrom" />
+                <input type="hidden" name="filterDateTo"    value="@ViewBag.DateTo" />
+                <input type="hidden" name="filterItemCode"  value="@ViewBag.ItemCode" />
+                <input type="hidden" name="filterOperation" value="@ViewBag.Operation" />
                 <input type="hidden" id="dh_id" name="id" />
                 <div class="modal-footer justify-content-center">
                     <button type="button" class="btn-reset px-4" data-bs-dismiss="modal">Hủy</button>
@@ -542,6 +550,10 @@
             </div>
             <form method="post" asp-controller="Defect" asp-action="EditRecord">
                 @Html.AntiForgeryToken()
+                <input type="hidden" name="filterDateFrom"  value="@ViewBag.DateFrom" />
+                <input type="hidden" name="filterDateTo"    value="@ViewBag.DateTo" />
+                <input type="hidden" name="filterItemCode"  value="@ViewBag.ItemCode" />
+                <input type="hidden" name="filterOperation" value="@ViewBag.Operation" />
                 <input type="hidden" id="er_origItemCode"    name="origItemCode" />
                 <input type="hidden" id="er_origDefectCode"  name="origDefectCode" />
                 <input type="hidden" id="er_origIns"         name="origInsDatetime" />
@@ -603,6 +615,10 @@
             </div>
             <form method="post" asp-controller="Defect" asp-action="DeleteRecord">
                 @Html.AntiForgeryToken()
+                <input type="hidden" name="filterDateFrom"  value="@ViewBag.DateFrom" />
+                <input type="hidden" name="filterDateTo"    value="@ViewBag.DateTo" />
+                <input type="hidden" name="filterItemCode"  value="@ViewBag.ItemCode" />
+                <input type="hidden" name="filterOperation" value="@ViewBag.Operation" />
                 <input type="hidden" id="dr_itemCode"   name="itemCode" />
                 <input type="hidden" id="dr_defectCode" name="defectCode" />
                 <input type="hidden" id="dr_ins"        name="insDatetime" />

@@ -260,6 +260,13 @@
     </div>
 </div>
 
+@if (ViewBag.TotalInDb != null && ViewBag.TotalInDb != Model.Count)
+{
+    <div style="background:#FFF3CD;border:1px solid #FFEAA7;border-radius:8px;padding:.6rem 1rem;margin-bottom:1rem;font-size:.85rem;color:#856404">
+        ⚠️ DB có <strong>@ViewBag.TotalInDb</strong> bản ghi nhưng chỉ hiển thị <strong>@Model.Count</strong> — có thể do bộ lọc ngày hoặc kết nối DB.
+    </div>
+}
+
 <!-- ── Table ── -->
 <div class="table-card">
     <div class="table-card-header">

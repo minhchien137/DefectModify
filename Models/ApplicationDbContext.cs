@@ -17,6 +17,10 @@ namespace DefectModify.Models
         {
             modelBuilder.Entity<SVN_Defect_Record>()
                 .HasKey(r => new { r.Item_code, r.Defect_Code, r.INSDatetime, r.Operation });
+
+            // Đảm bảo EF map đúng tên bảng trong DB
+            modelBuilder.Entity<DefectEditLog>()
+                .ToTable("DefectEditLog");
         }
     }
 }

@@ -15,9 +15,9 @@ namespace DefectModify.Models
 
         public string Operation { get; set; }
 
-        public string Employer_code { get; set; }
+        public string? Employer_code { get; set; }
 
-        public string Employer_name { get; set; }
+        public string? Employer_name { get; set; }
 
     }
 }
