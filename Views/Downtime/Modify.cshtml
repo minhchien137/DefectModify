@@ -248,7 +248,96 @@
     .modal-body .form-control[readonly] { background: #F7FAFA; color: var(--text-muted); }
     .del-icon { font-size: 2.8rem; margin-bottom: .6rem; }
 
-    @@media (max-width: 768px) {
+    .btn-add-single {
+        background: rgba(255,255,255,.18);
+        color: #fff;
+        border: 1.5px solid rgba(255,255,255,.5);
+        border-radius: 9px;
+        padding: .42rem 1rem;
+        font-size: .85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .2s;
+        white-space: nowrap;
+    }
+    .btn-add-single:hover { background: rgba(255,255,255,.32); }
+    .btn-add-bulk {
+        background: #fff;
+        color: var(--sage-dark);
+        border: 1.5px solid rgba(255,255,255,.7);
+        border-radius: 9px;
+        padding: .42rem 1rem;
+        font-size: .85rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all .2s;
+        white-space: nowrap;
+    }
+    .btn-add-bulk:hover { background: #e8f5ef; }
+
+    /* ── Create modal header ── */
+    .mh-create { background: linear-gradient(135deg, #2B6CB0, #4299E1); color: #fff; }
+
+    /* ── Bulk rows ── */
+    .bulk-row-wrap { display: flex; flex-direction: column; gap: .75rem; max-height: 420px; overflow-y: auto; padding-right: .25rem; }
+    .bulk-row {
+        background: #F7FBFE;
+        border: 1.5px solid #BEE3F8;
+        border-radius: 10px;
+        padding: .75rem .9rem .6rem;
+        position: relative;
+    }
+    .bulk-row .row-num {
+        font-size: .7rem; font-weight: 700;
+        color: #2B6CB0; letter-spacing: .04em;
+        text-transform: uppercase; margin-bottom: .45rem;
+    }
+    .btn-remove-row {
+        position: absolute; top: .55rem; right: .7rem;
+        background: none; border: none; color: #E53E3E;
+        font-size: 1rem; cursor: pointer; line-height: 1;
+        padding: 0;
+    }
+    .btn-remove-row:hover { color: #c53030; }
+    .btn-copy-row {
+        background: rgba(107,168,138,.12);
+        color: var(--sage-dark);
+        border: 1.5px solid var(--sage-light);
+        border-radius: 6px;
+        padding: .18rem .6rem;
+        font-size: .75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .18s;
+        line-height: 1.4;
+    }
+    .btn-copy-row:hover { background: var(--sage); color: #fff; border-color: var(--sage); }
+    .copy-target-item {
+        display: flex;
+        align-items: center;
+        padding: .45rem .7rem;
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: .85rem;
+        transition: all .15s;
+    }
+    .copy-target-item:hover { background: var(--sage-bg); border-color: var(--sage); }
+    .copy-target-item input[type=checkbox] { accent-color: var(--sage-dark); width:15px; height:15px; }
+    .btn-add-row {
+        background: rgba(66,153,225,.1);
+        color: #2B6CB0;
+        border: 1.5px dashed #90CDF4;
+        border-radius: 8px;
+        padding: .42rem;
+        font-size: .85rem;
+        font-weight: 600;
+        width: 100%;
+        cursor: pointer;
+        transition: all .2s;
+        margin-top: .5rem;
+    }
+    .btn-add-row:hover { background: rgba(66,153,225,.2); }
         .page-header { padding: 1rem 1.1rem; }
         .page-header h2 { font-size: 1.15rem; }
         .filter-card { padding: .9rem 1rem; }
@@ -263,6 +352,10 @@
         <div>
             <h2>🕐 Sửa đổi dữ liệu Downtime</h2>
             <p>Quản lý và chỉnh sửa bản ghi sự cố dừng máy</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn-add-single" onclick="openCreateModal()">➕ Thêm 1 bản ghi</button>
+            <button class="btn-add-bulk"   onclick="openCreateBulkModal()">📋 Thêm nhiều bản ghi</button>
         </div>
     </div>
 </div>
@@ -452,10 +545,8 @@
                             <label class="form-label">Trạng thái</label>
                             <select class="form-select" id="e_State" name="State">
                                 <option value="">-- Chọn --</option>
-                                @foreach (var s in stateList)
-                                {
-                                    <option value="@s">@s</option>
-                                }
+                                <option value="Stop">Stop</option>
+                                <option value="Run">Run</option>
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -476,7 +567,9 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">ISS Code</label>
-                            <input type="text" class="form-control" id="e_IssCode" name="ISS_Code" />
+                            <select class="form-select" id="e_IssCode" name="ISS_Code">
+                                <option value="">-- Chọn ISS Code --</option>
+                            </select>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">SVN Code</label>
@@ -526,8 +619,323 @@
 </div>
 
 
+<!-- Hidden reason list for JS -->
+@{
+    var reasonList = ViewBag.ReasonList as List<DefectModify.Models.SVN_Downtime_Reason> ?? new();
+    var reasonJson = System.Text.Json.JsonSerializer.Serialize(
+        reasonList.Select(r => new { code = r.Reason_Code, name = r.Reason_Name }));
+}
+<script id="reason-data" type="application/json">@Html.Raw(reasonJson)</script>
+
+<!-- ═══════════════════════════════════════════
+     CREATE SINGLE MODAL
+═══════════════════════════════════════════ -->
+<div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header mh-create">
+                <span class="modal-title" id="createModalLabel">➕ Thêm bản ghi Downtime</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-controller="Downtime" asp-action="Create">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="filterDateFrom"  value="@ViewBag.DateFrom" />
+                <input type="hidden" name="filterDateTo"    value="@ViewBag.DateTo" />
+                <input type="hidden" name="filterCode"      value="@ViewBag.Code" />
+                <input type="hidden" name="filterState"     value="@ViewBag.State" />
+                <input type="hidden" name="filterOperation" value="@ViewBag.Operation" />
+                <input type="hidden" name="filterIssCode"   value="@ViewBag.IssCode" />
+
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Mã sự cố</label>
+                            <input type="text" class="form-control" name="Code" placeholder="VD: DT001" />
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Tên sự cố</label>
+                            <input type="text" class="form-control" name="Name" placeholder="Tên sự cố" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Trạng thái</label>
+                            <select class="form-select" name="State">
+                                <option value="">-- Chọn --</option>
+                                <option value="Stop">Stop</option>
+                                <option value="Run">Run</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Công đoạn</label>
+                            <input type="text" class="form-control" name="Operation" placeholder="VD: POP" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Thời gian ước tính</label>
+                            <input type="text" class="form-control" name="EstimateTime" placeholder="VD: 30 phút" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Mô tả</label>
+                            <input type="text" class="form-control" name="Description" placeholder="Mô tả sự cố" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Thời gian xảy ra</label>
+                            <input type="datetime-local" class="form-control" name="Datetime" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">ISS Code</label>
+                            <select class="form-select" id="c_IssCode" name="ISS_Code">
+                                <option value="">-- Chọn ISS Code --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">SVN Code</label>
+                            <input type="text" class="form-control" name="SVNCode" placeholder="VD: SVN0132" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-reset" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn-filter ms-2" style="background:#2B6CB0">💾 Lưu bản ghi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     CREATE BULK MODAL
+═══════════════════════════════════════════ -->
+<div class="modal fade" id="createBulkModal" tabindex="-1" aria-labelledby="createBulkModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header mh-create">
+                <span class="modal-title" id="createBulkModalLabel">📋 Thêm nhiều bản ghi Downtime</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-controller="Downtime" asp-action="CreateBulk" id="bulkForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="filterDateFrom"  value="@ViewBag.DateFrom" />
+                <input type="hidden" name="filterDateTo"    value="@ViewBag.DateTo" />
+                <input type="hidden" name="filterCode"      value="@ViewBag.Code" />
+                <input type="hidden" name="filterState"     value="@ViewBag.State" />
+                <input type="hidden" name="filterOperation" value="@ViewBag.Operation" />
+                <input type="hidden" name="filterIssCode"   value="@ViewBag.IssCode" />
+
+                <div class="modal-body">
+                    <div class="bulk-row-wrap" id="bulkRows">
+                        <!-- Rows injected by JS -->
+                    </div>
+                    <button type="button" class="btn-add-row" onclick="addBulkRow()">➕ Thêm dòng</button>
+                </div>
+                <div class="modal-footer">
+                    <small class="text-muted me-auto" id="bulkRowCount"></small>
+                    <button type="button" class="btn-reset" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn-filter ms-2" style="background:#2B6CB0">💾 Lưu tất cả</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Copy Picker Modal -->
+<div class="modal fade" id="copyPickerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:380px">
+        <div class="modal-content">
+            <div class="modal-header" style="background:linear-gradient(135deg,var(--sage-dark),var(--sage));color:#fff;border:none;padding:.9rem 1.2rem">
+                <span class="modal-title" style="font-weight:700;font-size:.97rem">⧉ Sao chép vào bản ghi...</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding:1rem 1.2rem">
+                <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:.75rem">Chọn bản ghi sẽ được ghi đè dữ liệu:</p>
+                <div id="copyPickerBody" style="display:flex;flex-direction:column;gap:.45rem;max-height:260px;overflow-y:auto"></div>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #EDF2EF;padding:.75rem 1.2rem">
+                <input type="hidden" id="copyPickerSrcId" />
+                <button type="button" class="btn-reset" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn-filter ms-2" onclick="applyBulkCopy()">⧉ Sao chép</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
 <script>
+// ── Reason list from server ──
+const reasonList = JSON.parse(document.getElementById('reason-data').textContent || '[]');
+
+function buildReasonOptions(selectedCode) {
+    let html = '<option value="">-- Chọn ISS Code --</option>';
+    for (const r of reasonList) {
+        const sel = r.code === selectedCode ? ' selected' : '';
+        html += `<option value="${r.code}"${sel}>${r.code} — ${r.name}</option>`;
+    }
+    return html;
+}
+
+// ── Create Single ──
+function openCreateModal() {
+    document.getElementById('c_IssCode').innerHTML = buildReasonOptions('');
+    new bootstrap.Modal(document.getElementById('createModal')).show();
+}
+
+// ── Create Bulk ──
+let bulkRowIndex = 0;
+
+function addBulkRow(prefill) {
+    const idx = bulkRowIndex++;
+    const wrap = document.getElementById('bulkRows');
+    const div = document.createElement('div');
+    div.className = 'bulk-row';
+    div.id = `brow_${idx}`;
+    div.innerHTML = `
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="row-num" style="margin-bottom:0">Bản ghi #${idx + 1}</span>
+            <div class="d-flex gap-1">
+                <button type="button" class="btn-copy-row" onclick="copyBulkRow('brow_${idx}')" title="Sao chép bản ghi này">⧉ Sao chép</button>
+                <button type="button" class="btn-remove-row" style="position:static" onclick="removeBulkRow('brow_${idx}')">✕</button>
+            </div>
+        </div>
+        <div class="row g-2">
+            <div class="col-md-3 col-6">
+                <label class="form-label" style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#2B6CB0;letter-spacing:.04em">Mã sự cố</label>
+                <input type="text" class="form-control form-control-sm" name="items[${idx}].Code" placeholder="DT001" value="${prefill?.Code ?? ''}" />
+            </div>
+            <div class="col-md-5 col-6">
+                <label class="form-label" style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#2B6CB0;letter-spacing:.04em">Tên sự cố</label>
+                <input type="text" class="form-control form-control-sm" name="items[${idx}].Name" placeholder="Tên sự cố" value="${prefill?.Name ?? ''}" />
+            </div>
+            <div class="col-md-2 col-6">
+                <label class="form-label" style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#2B6CB0;letter-spacing:.04em">Trạng thái</label>
+                <select class="form-select form-select-sm" name="items[${idx}].State">
+                    <option value="">--</option>
+                    <option value="Stop" ${prefill?.State === 'Stop' ? 'selected' : ''}>Stop</option>
+                    <option value="Run"  ${prefill?.State === 'Run'  ? 'selected' : ''}>Run</option>
+                </select>
+            </div>
+            <div class="col-md-2 col-6">
+                <label class="form-label" style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#2B6CB0;letter-spacing:.04em">Công đoạn</label>
+                <input type="text" class="form-control form-control-sm" name="items[${idx}].Operation" placeholder="POP" value="${prefill?.Operation ?? ''}" />
+            </div>
+            <div class="col-md-2 col-6">
+                <label class="form-label" style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#2B6CB0;letter-spacing:.04em">TG ước tính</label>
+                <input type="text" class="form-control form-control-sm" name="items[${idx}].EstimateTime" placeholder="30 phút" value="${prefill?.EstimateTime ?? ''}" />
+            </div>
+            <div class="col-md-4 col-12">
+                <label class="form-label" style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#2B6CB0;letter-spacing:.04em">Mô tả</label>
+                <input type="text" class="form-control form-control-sm" name="items[${idx}].Description" placeholder="Mô tả" value="${prefill?.Description ?? ''}" />
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label" style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#2B6CB0;letter-spacing:.04em">Thời gian</label>
+                <input type="datetime-local" class="form-control form-control-sm" name="items[${idx}].Datetime" value="${prefill?.Datetime ?? ''}" />
+            </div>
+            <div class="col-md-2 col-6">
+                <label class="form-label" style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#2B6CB0;letter-spacing:.04em">ISS Code</label>
+                <select class="form-select form-select-sm" name="items[${idx}].ISS_Code">
+                    ${buildReasonOptions(prefill?.ISS_Code ?? '')}
+                </select>
+            </div>
+            <div class="col-md-1 col-6">
+                <label class="form-label" style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#2B6CB0;letter-spacing:.04em">SVN Code</label>
+                <input type="text" class="form-control form-control-sm" name="items[${idx}].SVNCode" placeholder="SVN0132" value="${prefill?.SVNCode ?? ''}" />
+            </div>
+        </div>`;
+    wrap.appendChild(div);
+    // Scroll to new row
+    div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    updateBulkCount();
+}
+
+function copyBulkRow(srcId) {
+    const row = document.getElementById(srcId);
+    if (!row) return;
+
+    // Thu thập data từ row nguồn
+    const get = (sel) => row.querySelector(sel)?.value ?? '';
+    const data = {
+        Code:         get('input[name$="].Code"]'),
+        Name:         get('input[name$="].Name"]'),
+        State:        get('select[name$="].State"]'),
+        Operation:    get('input[name$="].Operation"]'),
+        EstimateTime: get('input[name$="].EstimateTime"]'),
+        Description:  get('input[name$="].Description"]'),
+        Datetime:     get('input[name$="].Datetime"]'),
+        ISS_Code:     get('select[name$="].ISS_Code"]'),
+        SVNCode:      get('input[name$="].SVNCode"]'),
+    };
+
+    // Lấy danh sách tất cả row hiện có (trừ row nguồn)
+    const allRows = [...document.querySelectorAll('#bulkRows .bulk-row')];
+    const targets = allRows.filter(r => r.id !== srcId);
+
+    if (targets.length === 0) {
+        alert('Không có bản ghi nào khác để sao chép vào!');
+        return;
+    }
+
+    // Build danh sách lựa chọn
+    const items = targets.map(r => {
+        const label = r.querySelector('input[name$="].Code"]')?.value || '(trống)';
+        const num   = r.querySelector('.row-num')?.textContent || r.id;
+        return `<label class="copy-target-item">
+            <input type="checkbox" value="${r.id}" class="copy-target-cb me-2" />
+            <span><strong>${num}</strong> — ${label}</span>
+        </label>`;
+    }).join('');
+
+    // Hiện picker modal
+    document.getElementById('copyPickerBody').innerHTML = items;
+    document.getElementById('copyPickerSrcId').value = srcId;
+    window._copyData = data;
+    new bootstrap.Modal(document.getElementById('copyPickerModal')).show();
+}
+
+function applyBulkCopy() {
+    const data = window._copyData;
+    if (!data) return;
+    const checked = [...document.querySelectorAll('.copy-target-cb:checked')];
+    if (checked.length === 0) { alert('Hãy chọn ít nhất 1 bản ghi!'); return; }
+
+    checked.forEach(cb => {
+        const row = document.getElementById(cb.value);
+        if (!row) return;
+        const setVal = (sel, val) => { const el = row.querySelector(sel); if (el) el.value = val; };
+        setVal('input[name$="].Code"]',         data.Code);
+        setVal('input[name$="].Name"]',         data.Name);
+        setVal('select[name$="].State"]',        data.State);
+        setVal('input[name$="].Operation"]',     data.Operation);
+        setVal('input[name$="].EstimateTime"]',  data.EstimateTime);
+        setVal('input[name$="].Description"]',   data.Description);
+        setVal('input[name$="].Datetime"]',      data.Datetime);
+        setVal('select[name$="].ISS_Code"]',     data.ISS_Code);
+        setVal('input[name$="].SVNCode"]',       data.SVNCode);
+
+        // Flash highlight
+        row.style.transition = 'background .15s';
+        row.style.background = '#d1fae5';
+        setTimeout(() => row.style.background = '', 800);
+    });
+
+    bootstrap.Modal.getInstance(document.getElementById('copyPickerModal')).hide();
+}
+
+function removeBulkRow(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+    updateBulkCount();
+}
+
+function updateBulkCount() {
+    const n = document.querySelectorAll('#bulkRows .bulk-row').length;
+    document.getElementById('bulkRowCount').textContent = `${n} bản ghi`;
+}
+
+function openCreateBulkModal() {
+    // Reset rows
+    document.getElementById('bulkRows').innerHTML = '';
+    bulkRowIndex = 0;
+    addBulkRow(); // Start with 1 row
+    new bootstrap.Modal(document.getElementById('createBulkModal')).show();
+}
+
 function openEditModal(btn) {
     const d = btn.dataset;
     document.getElementById('e_Id').value           = d.id           ?? '';
@@ -537,10 +945,12 @@ function openEditModal(btn) {
     document.getElementById('e_EstimateTime').value = d.estimatetime ?? '';
     document.getElementById('e_Description').value  = d.description  ?? '';
     document.getElementById('e_Datetime').value     = d.datetime     ?? '';
-    document.getElementById('e_IssCode').value      = d.isscode      ?? '';
     document.getElementById('e_SvnCode').value      = d.svncode      ?? '';
 
-    // Set State dropdown
+    // ISS Code dropdown
+    document.getElementById('e_IssCode').innerHTML = buildReasonOptions(d.isscode ?? '');
+
+    // Set State dropdown (Stop / Run)
     const sel = document.getElementById('e_State');
     for (let i = 0; i < sel.options.length; i++) {
         sel.options[i].selected = (sel.options[i].value === (d.state ?? ''));

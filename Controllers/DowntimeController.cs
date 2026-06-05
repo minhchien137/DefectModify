@@ -56,12 +56,118 @@ namespace DefectModify.Controllers
                 .ToListAsync();
             ViewBag.StateList = stateList;
 
+            // Lấy danh sách ISS Code từ SVN_Downtime_Reason
+            var reasonList = await _context.SVN_Downtime_Reasons
+                .OrderBy(r => r.Reason_Code)
+                .ToListAsync();
+            ViewBag.ReasonList = reasonList;
+
             var records = await q
                 .OrderByDescending(r => r.Datetime)
                 .Take(300)
                 .ToListAsync();
 
             return View(records);
+        }
+
+        // ============================================================
+        //  POST: Create single SVN_Downtime_Info
+        // ============================================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(SVN_Downtime_Info model,
+            string? filterDateFrom, string? filterDateTo,
+            string? filterCode, string? filterState,
+            string? filterOperation, string? filterIssCode)
+        {
+            var redirectParams = new
+            {
+                dateFrom  = filterDateFrom,
+                dateTo    = filterDateTo,
+                code      = filterCode,
+                state     = filterState,
+                operation = filterOperation,
+                issCode   = filterIssCode
+            };
+
+            model.Id = 0; // Đảm bảo identity tự sinh
+
+            _context.SVN_Downtime_Infos.Add(model);
+
+            _context.DefectEditLogs.Add(new DefectEditLog
+            {
+                TableName  = "SVN_Downtime_Info",
+                Action     = "Create",
+                RecordId   = null,
+                NewValues  = JsonSerializer.Serialize(new
+                {
+                    model.Code, model.Name, model.State,
+                    model.Operation, model.EstimateTime,
+                    model.Description, model.Datetime,
+                    model.ISS_Code, model.SVNCode
+                }),
+                ModifiedAt = DateTime.Now,
+                ModifiedBy = User.Identity?.Name ?? "anonymous"
+            });
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"Đã thêm bản ghi mới thành công!";
+            return RedirectToAction(nameof(Modify), redirectParams);
+        }
+
+        // ============================================================
+        //  POST: Create bulk SVN_Downtime_Info
+        // ============================================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateBulk(
+            [FromForm] DowntimeBulkViewModel vm,
+            string? filterDateFrom, string? filterDateTo,
+            string? filterCode, string? filterState,
+            string? filterOperation, string? filterIssCode)
+        {
+            var redirectParams = new
+            {
+                dateFrom  = filterDateFrom,
+                dateTo    = filterDateTo,
+                code      = filterCode,
+                state     = filterState,
+                operation = filterOperation,
+                issCode   = filterIssCode
+            };
+
+            if (vm.Items == null || !vm.Items.Any())
+            {
+                TempData["Error"] = "Không có bản ghi nào để lưu!";
+                return RedirectToAction(nameof(Modify), redirectParams);
+            }
+
+            foreach (var item in vm.Items)
+            {
+                item.Id = 0;
+                _context.SVN_Downtime_Infos.Add(item);
+                _context.DefectEditLogs.Add(new DefectEditLog
+                {
+                    TableName  = "SVN_Downtime_Info",
+                    Action     = "Create",
+                    RecordId   = null,
+                    NewValues  = JsonSerializer.Serialize(new
+                    {
+                        item.Code, item.Name, item.State,
+                        item.Operation, item.EstimateTime,
+                        item.Description, item.Datetime,
+                        item.ISS_Code, item.SVNCode
+                    }),
+                    ModifiedAt = DateTime.Now,
+                    ModifiedBy = User.Identity?.Name ?? "anonymous"
+                });
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"Đã thêm {vm.Items.Count} bản ghi thành công!";
+            return RedirectToAction(nameof(Modify), redirectParams);
         }
 
         // ============================================================

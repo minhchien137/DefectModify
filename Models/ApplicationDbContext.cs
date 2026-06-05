@@ -15,6 +15,8 @@ namespace DefectModify.Models
 
         public DbSet<SVN_Downtime_Info> SVN_Downtime_Infos { get; set; }
 
+        public DbSet<SVN_Downtime_Reason> SVN_Downtime_Reasons { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<SVN_Defect_Record>()
