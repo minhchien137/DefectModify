@@ -10,11 +10,13 @@ namespace DefectModify.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly string _connStr;
+        private readonly IWebHostEnvironment _webHostEnvironment;
 
-        public DefectController(ApplicationDbContext context, IConfiguration configuration)
+        public DefectController(ApplicationDbContext context, IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
         {
             _context = context;
             _connStr = configuration.GetConnectionString("DefaultConnection")!;
+            _webHostEnvironment = webHostEnvironment;
         }
 
         // ============================================================
@@ -27,7 +29,6 @@ namespace DefectModify.Controllers
             string? itemCode, string? defectCode,
             string? insDatetime, string? operation)
         {
-            // Tính tổng Qty_NG từ tất cả history records cùng nhóm
             var totalQty = await _context.SVN_Defect_Record_Histories
                 .Where(h => h.Item_code   == itemCode
                          && h.Defect_Code == defectCode
@@ -35,24 +36,51 @@ namespace DefectModify.Controllers
                          && h.Operation   == operation)
                 .SumAsync(h => (int?)h.Qty_NG) ?? 0;
 
+            // Kiểm tra Record có tồn tại không
+            var exists = await _context.SVN_Defect_Records
+                .AnyAsync(r => r.Item_code   == itemCode
+                            && r.Defect_Code == defectCode
+                            && r.INSDatetime == insDatetime
+                            && r.Operation   == operation);
+
             if (totalQty > 0)
             {
-                // Còn history → UPDATE Qty_NG trong Record
-                await _context.Database.ExecuteSqlRawAsync(
-                    @"UPDATE SVN_Defect_Record
-                      SET Qty_NG = {0}
-                      WHERE Item_code = {1} AND Defect_Code = {2}
-                        AND INSDatetime = {3} AND Operation = {4}",
-                    totalQty.ToString(), itemCode, defectCode, insDatetime, operation);
+                if (exists)
+                {
+                    // Đã có → UPDATE tổng Qty_NG
+                    await _context.Database.ExecuteSqlRawAsync(
+                        @"UPDATE SVN_Defect_Record
+                          SET Qty_NG = {0}
+                          WHERE Item_code = {1} AND Defect_Code = {2}
+                            AND INSDatetime = {3} AND Operation = {4}",
+                        totalQty.ToString(), itemCode, defectCode, insDatetime, operation);
+                }
+                else
+                {
+                    // Chưa có → INSERT mới (không lưu Employer vào Record)
+                    await _context.Database.ExecuteSqlRawAsync(
+                        @"INSERT INTO SVN_Defect_Record
+                            (Item_code, Defect_Code, Qty_NG, INSDatetime, Operation)
+                          VALUES ({0}, {1}, {2}, {3}, {4})",
+                        itemCode   ?? "",
+                        defectCode ?? "",
+                        totalQty.ToString(),
+                        insDatetime ?? "",
+                        operation   ?? "");
+                }
             }
             else
             {
-                // Không còn history nào → DELETE Record
-                await _context.Database.ExecuteSqlRawAsync(
-                    @"DELETE FROM SVN_Defect_Record
-                      WHERE Item_code = {0} AND Defect_Code = {1}
-                        AND INSDatetime = {2} AND Operation = {3}",
-                    itemCode, defectCode, insDatetime, operation);
+                if (exists)
+                {
+                    // Không còn history nào → DELETE Record
+                    await _context.Database.ExecuteSqlRawAsync(
+                        @"DELETE FROM SVN_Defect_Record
+                          WHERE Item_code = {0} AND Defect_Code = {1}
+                            AND INSDatetime = {2} AND Operation = {3}",
+                        itemCode, defectCode, insDatetime, operation);
+                }
+                // Nếu không tồn tại + totalQty = 0 → không làm gì
             }
         }
 
@@ -103,6 +131,14 @@ namespace DefectModify.Controllers
                 HistoryRecords = await histQ.OrderByDescending(r => r.INSDatetime).Take(300).ToListAsync(),
                 DefectRecords  = await recQ.OrderByDescending(r => r.INSDatetime).Take(300).ToListAsync()
             };
+
+            // Dropdown Operations cho modal Insert
+            ViewBag.Operations = await _context.SVN_quality_reasons
+                .Where(r => r.operation != null)
+                .Select(r => r.operation)
+                .Distinct()
+                .OrderBy(o => o)
+                .ToListAsync();
 
             return View(vm);
         }
@@ -206,7 +242,106 @@ namespace DefectModify.Controllers
         }
 
         // ============================================================
-        //  POST: Delete SVN_Defect_Record_History
+        //  POST: Insert SVN_Defect_Record_History (+ upsert Record)
+        //  - Thêm mới 1 dòng vào History (kèm upload ảnh nếu có)
+        //  - Nếu Record cùng nhóm key đã tồn tại → cộng thêm Qty_NG
+        //  - Nếu chưa có → INSERT Record mới
+        // ============================================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> InsertHistory(SVN_Defect_Record_History model,
+            IFormFile? imageFile,
+            string? filterDateFrom, string? filterDateTo,
+            string? filterItemCode, string? filterOperation)
+        {
+            var redirectParams = new {
+                table     = "history",
+                dateFrom  = filterDateFrom,
+                dateTo    = filterDateTo,
+                itemCode  = filterItemCode,
+                operation = filterOperation
+            };
+
+            // ---- Xử lý upload ảnh ----
+            if (imageFile != null && imageFile.Length > 0)
+            {
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
+                var ext = Path.GetExtension(imageFile.FileName).ToLower();
+
+                if (!allowedExtensions.Contains(ext))
+                {
+                    TempData["Error"] = "Chỉ cho phép upload ảnh: jpg, jpeg, png, gif, bmp, webp";
+                    return RedirectToAction(nameof(Modify), redirectParams);
+                }
+
+                if (imageFile.Length > 5 * 1024 * 1024)
+                {
+                    TempData["Error"] = "Kích thước ảnh không được vượt quá 5MB";
+                    return RedirectToAction(nameof(Modify), redirectParams);
+                }
+
+                var uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "defect-images");
+                if (!Directory.Exists(uploadsFolder))
+                    Directory.CreateDirectory(uploadsFolder);
+
+                var fileName = $"{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}{ext}";
+                var filePath = Path.Combine(uploadsFolder, fileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                    await imageFile.CopyToAsync(stream);
+
+                model.Image_error = $"/uploads/defect-images/{fileName}";
+            }
+
+            // ---- Gán Time_line từ INSDatetime (parse YYYYMMDD) + giờ random ----
+            if (!string.IsNullOrEmpty(model.INSDatetime)
+                && DateTime.TryParseExact(model.INSDatetime, "yyyyMMdd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var parsedDate))
+            {
+                var rng = new Random();
+                model.Time_line = parsedDate
+                    .AddHours(rng.Next(0, 24))
+                    .AddMinutes(rng.Next(0, 60))
+                    .AddSeconds(rng.Next(0, 60));
+            }
+            else
+            {
+                model.Time_line = DateTime.Now;
+            }
+
+            _context.SVN_Defect_Record_Histories.Add(model);
+
+            _context.DefectEditLogs.Add(new DefectEditLog
+            {
+                TableName  = "SVN_Defect_Record_History",
+                Action     = "Insert",
+                RecordId   = null,
+                NewValues  = JsonSerializer.Serialize(new
+                {
+                    model.Work_order, model.Item_code, model.Defect_Code,
+                    model.Defect_Name, model.Qty_NG, model.INSDatetime,
+                    model.Operation, model.Employer_code, model.Employer_name,
+                    model.Note, model.Image_error
+                }),
+                ModifiedAt = DateTime.Now,
+                ModifiedBy = User.Identity?.Name ?? "anonymous"
+            });
+
+            try { await _context.SaveChangesAsync(); }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Lỗi khi lưu History: {ex.InnerException?.Message ?? ex.Message}";
+                return RedirectToAction(nameof(Modify), redirectParams);
+            }
+
+            // ---- Upsert SVN_Defect_Record qua SyncRecordFromHistory ----
+            // Helper tự xử lý: chưa có → INSERT, đã có → UPDATE tổng Qty_NG
+            await SyncRecordFromHistory(model.Item_code, model.Defect_Code, model.INSDatetime, model.Operation);
+
+            TempData["Success"] = "Đã thêm lịch sử lỗi và đồng bộ bản ghi lỗi thành công!";
+            return RedirectToAction(nameof(Modify), redirectParams);
+        }
         //  Sau khi xóa History → tính lại tổng nhóm đó trong Record
         //  Nếu không còn history nào → DELETE Record luôn
         // ============================================================
@@ -393,6 +528,61 @@ namespace DefectModify.Controllers
             }
 
             return View(logs);
+        }
+
+        // ============================================================
+        //  Proxy → DefectManagement Odoo API
+        //  Tránh CORS khi gọi từ browser sang port khác
+        // ============================================================
+        private const string _odooBase = "http://10.10.99.10:8108";
+
+        [HttpGet]
+        public async Task<IActionResult> OdooSearchName([FromQuery] string nameEmployer)
+        {
+            try
+            {
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                var url = $"{_odooBase}/api/Odoo/SearchName?nameEmployer={Uri.EscapeDataString(nameEmployer)}";
+                var resp = await http.GetAsync(url);
+                var body = await resp.Content.ReadAsStringAsync();
+                return Content(body, "application/json");
+            }
+            catch (Exception ex)
+            {
+                return Json(new { error = ex.Message });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> OdooSearch([FromQuery] string productionCode)
+        {
+            try
+            {
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                var url = $"{_odooBase}/api/Odoo/search?productionCode={Uri.EscapeDataString(productionCode)}";
+                var resp = await http.GetAsync(url);
+                var body = await resp.Content.ReadAsStringAsync();
+                return Content(body, "application/json");
+            }
+            catch (Exception ex)
+            {
+                return Json(new { error = ex.Message });
+            }
+        }
+
+        // ============================================================
+        //  API: Lấy danh sách Defect Code + Name theo Operation
+        //  Dùng cho dropdown Mã lỗi trong modal Insert
+        // ============================================================
+        [HttpGet]
+        public async Task<IActionResult> GetDefectCodesByOperation([FromQuery] string operation)
+        {
+            var codes = await _context.SVN_quality_reasons
+                .Where(r => r.operation == operation)
+                .OrderBy(r => r.code)
+                .Select(r => new { code = r.code, name = r.name })
+                .ToListAsync();
+            return Json(codes);
         }
     }
 }

@@ -238,6 +238,21 @@
     .modal-body .form-control[readonly] { background: #F7FAFA; color: var(--text-muted); }
     .del-icon { font-size: 2.8rem; margin-bottom: .6rem; }
 
+    /* ---- Insert button ---- */
+    .btn-add-history {
+        background: rgba(255,255,255,.18);
+        color: #fff;
+        border: 1.5px solid rgba(255,255,255,.5);
+        border-radius: 9px;
+        padding: .42rem 1rem;
+        font-size: .85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .2s;
+        white-space: nowrap;
+    }
+    .btn-add-history:hover { background: rgba(255,255,255,.32); }
+
     /* ---- Responsive ---- */
     @@media (max-width: 768px) {
         .page-header { padding: 1rem 1.1rem; }
@@ -256,10 +271,9 @@
             <h2>⚙️ Sửa đổi dữ liệu lỗi</h2>
             <p>Quản lý và chỉnh sửa bản ghi lỗi sản xuất</p>
         </div>
-        <a asp-controller="Defect" asp-action="Log"
-           class="btn btn-light btn-sm fw-semibold d-flex align-items-center gap-1">
-            📋 Lịch sử thay đổi
-        </a>
+        <div class="d-flex gap-2 align-items-center">
+            <button class="btn-add-history" onclick="openInsertModal()">➕ Thêm lịch sử lỗi</button>
+        </div>
     </div>
 </div>
 
@@ -633,9 +647,310 @@
 </div>
 
 
+<!-- Insert History Modal -->
+<div class="modal fade" id="insertHistoryModal" tabindex="-1" aria-labelledby="insertHistoryLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header mh-edit">
+                <span class="modal-title" id="insertHistoryLabel">➕ Thêm lịch sử lỗi mới</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" asp-controller="Defect" asp-action="InsertHistory"
+                  enctype="multipart/form-data" id="insertHistoryForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="filterDateFrom"  value="@ViewBag.DateFrom" />
+                <input type="hidden" name="filterDateTo"    value="@ViewBag.DateTo" />
+                <input type="hidden" name="filterItemCode"  value="@ViewBag.ItemCode" />
+                <input type="hidden" name="filterOperation" value="@ViewBag.Operation" />
+
+                <div class="modal-body">
+                    <div class="row g-3">
+
+                        
+                        <div class="col-md-4">
+                            <label class="form-label">SVN Code (Mã nhân viên) <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="ins_EmpCode" name="Employer_code"
+                                   placeholder="VD: SVN0132" required
+                                   oninput="ins_clearEmpName()" />
+                            <div id="ins_empNameDisplay" style="margin-top:.35rem;font-size:.8rem;font-weight:700;color:#2B6CB0;min-height:1.2em"></div>
+                        </div>
+
+                        
+                        <div class="col-md-4">
+                            <label class="form-label">Work Order <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="ins_WorkOrder" name="Work_order"
+                                   placeholder="VD: WO-20250605" required
+                                   oninput="ins_clearItemCode()" />
+                            <div id="ins_itemCodeDisplay" style="margin-top:.35rem;font-size:.8rem;font-weight:700;color:#2B6CB0;min-height:1.2em"></div>
+                        </div>
+
+                        
+                        <div class="col-md-4">
+                            <label class="form-label">Mã sản phẩm</label>
+                            <input type="text" class="form-control" id="ins_ItemCode" name="Item_code"
+                                   placeholder="Tự điền từ Work Order..." />
+                            <small class="text-muted" style="font-size:.72rem">Tự lấy từ Odoo, hoặc nhập tay</small>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Tên nhân viên</label>
+                            <input type="text" class="form-control" id="ins_EmpName" name="Employer_name"
+                                   placeholder="Tự điền từ SVN Code..." />
+                            <small class="text-muted" style="font-size:.72rem">Tự lấy từ Odoo, hoặc nhập tay</small>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Mã lỗi <span class="text-danger">*</span></label>
+                            <select class="form-select" id="ins_DefectCode" name="Defect_Code" required>
+                                <option value="">-- Chọn mã lỗi --</option>
+                            </select>
+                            <small class="text-muted" style="font-size:.72rem">Chọn Operation trước</small>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Tên lỗi</label>
+                            <input type="text" class="form-control" id="ins_DefectName" name="Defect_Name"
+                                   placeholder="Tự điền khi chọn mã lỗi" readonly
+                                   style="background:#f7f9f7" />
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Số lượng NG <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="Qty_NG"
+                                   min="1" placeholder="VD: 5" required />
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Ngày <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="ins_INS" name="INSDatetime"
+                                   maxlength="8" placeholder="20250605" required
+                                   oninput="this.value=this.value.replace(/\D/g,'')" />
+                            <small class="text-muted" style="font-size:.72rem">YYYYMMDD</small>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Công đoạn <span class="text-danger">*</span></label>
+                            <select class="form-select" id="ins_Operation" name="Operation" required>
+                                <option value="">-- Chọn công đoạn --</option>
+                                @foreach (var op in (ViewBag.Operations as List<string> ?? new()))
+                                {
+                                    <option value="@op">@op</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Ghi chú</label>
+                            <input type="text" class="form-control" name="Note"
+                                   placeholder="Ghi chú thêm..." />
+                        </div>
+
+                        
+                        <div class="col-12">
+                            <label class="form-label">Ảnh lỗi (tùy chọn)</label>
+                            <div id="ins_uploadArea" onclick="document.getElementById('ins_imageInput').click()"
+                                 style="border:2px dashed var(--border);border-radius:10px;padding:1.2rem;text-align:center;cursor:pointer;background:#FAFCFB;transition:all .2s">
+                                <div style="font-size:1.6rem;opacity:.45">📷</div>
+                                <div style="font-size:.83rem;color:var(--text-muted);margin-top:.3rem">Nhấp hoặc kéo ảnh vào đây</div>
+                                <div style="font-size:.75rem;color:var(--text-muted)">JPG, PNG, GIF, BMP, WEBP — tối đa 5MB</div>
+                            </div>
+                            <input type="file" id="ins_imageInput" name="imageFile"
+                                   accept="image/*" style="display:none" />
+                            <div id="ins_imagePreview" style="display:none;margin-top:.6rem;position:relative">
+                                <img id="ins_previewImg"
+                                     style="max-height:160px;max-width:100%;border-radius:8px;border:1.5px solid var(--border);object-fit:contain" />
+                                <div id="ins_fileName" style="font-size:.76rem;color:var(--text-muted);margin-top:.25rem"></div>
+                                <button type="button" onclick="ins_removeImage()"
+                                        style="position:absolute;top:4px;right:4px;background:rgba(229,62,62,.85);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:.75rem;line-height:1;cursor:pointer">✕</button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div style="margin-top:1rem;padding:.7rem 1rem;background:#EFF7F3;border:1px solid #D4E6DC;border-radius:8px;font-size:.79rem;color:#3E7A5E">
+                        ℹ️ <strong>Lưu ý:</strong> Sau khi thêm, hệ thống tự đồng bộ vào <strong>Bản ghi lỗi</strong> —
+                        chưa có → <strong>tạo mới</strong>, đã có → <strong>cộng thêm</strong> Qty NG.
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-reset" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn-filter ms-2">💾 Lưu &amp; đồng bộ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
 <script>
-// ── Edit History ──
+// ══════════════════════════════════════════
+//  INSERT HISTORY — Odoo lookup + Image upload
+// ══════════════════════════════════════════
+
+function openInsertModal() {
+    document.getElementById('insertHistoryForm').reset();
+    document.getElementById('ins_empNameDisplay').textContent  = '';
+    document.getElementById('ins_itemCodeDisplay').textContent = '';
+    document.getElementById('ins_imagePreview').style.display  = 'none';
+    document.getElementById('ins_uploadArea').style.display    = 'block';
+    // Reset defect code dropdown
+    document.getElementById('ins_DefectCode').innerHTML = '<option value="">-- Chọn mã lỗi --</option>';
+    document.getElementById('ins_DefectName').value = '';
+    // Không prefill ngày — người dùng tự nhập đúng ngày của record
+    document.getElementById('ins_INS').value = '';
+    new bootstrap.Modal(document.getElementById('insertHistoryModal')).show();
+}
+
+// ── SVN Code → Odoo → Tên nhân viên ──
+function ins_clearEmpName() {
+    document.getElementById('ins_EmpName').value = '';
+    document.getElementById('ins_empNameDisplay').textContent = '';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+
+// ── Operation dropdown → load Defect Codes ──
+document.getElementById('ins_Operation').addEventListener('change', function () {
+    const op = this.value;
+    const codeSelect = document.getElementById('ins_DefectCode');
+    const nameInput  = document.getElementById('ins_DefectName');
+
+    codeSelect.innerHTML = '<option value="">-- Đang tải... --</option>';
+    nameInput.value = '';
+
+    if (!op) {
+        codeSelect.innerHTML = '<option value="">-- Chọn mã lỗi --</option>';
+        return;
+    }
+
+    fetch('/Defect/GetDefectCodesByOperation?operation=' + encodeURIComponent(op))
+        .then(r => r.json())
+        .then(data => {
+            codeSelect.innerHTML = '<option value="">-- Chọn mã lỗi --</option>';
+            data.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.code;
+                opt.textContent = item.code + ' — ' + item.name;
+                opt.dataset.name = item.name;
+                codeSelect.appendChild(opt);
+            });
+        })
+        .catch(() => {
+            codeSelect.innerHTML = '<option value="">-- Lỗi tải dữ liệu --</option>';
+        });
+});
+
+// ── Defect Code → tự điền Tên lỗi ──
+document.getElementById('ins_DefectCode').addEventListener('change', function () {
+    const selected = this.options[this.selectedIndex];
+    document.getElementById('ins_DefectName').value = selected?.dataset?.name ?? '';
+});
+
+document.getElementById('ins_EmpCode').addEventListener('blur', function () {
+    const code = this.value.trim();
+    const display = document.getElementById('ins_empNameDisplay');
+    if (!code || code.length < 7) {
+        display.textContent = code.length > 0 ? '⚠️ SVN Code cần ít nhất 7 ký tự' : '';
+        display.style.color = '#E53E3E';
+        return;
+    }
+    display.textContent = '⏳ Đang tìm...';
+    display.style.color = '#718096';
+    fetch('/Defect/OdooSearchName?nameEmployer=' + encodeURIComponent(code))
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(res => {
+            if (res.nameEmployer) {
+                document.getElementById('ins_EmpName').value = res.nameEmployer;
+                display.textContent = '✅ ' + res.nameEmployer;
+                display.style.color = '#2B6CB0';
+            } else {
+                display.textContent = '❌ Không tìm thấy nhân viên';
+                display.style.color = '#E53E3E';
+            }
+        })
+        .catch(() => {
+            display.textContent = '❌ Lỗi kết nối Odoo';
+            display.style.color = '#E53E3E';
+        });
+});
+
+// ── Work Order → Odoo → Item code ──
+function ins_clearItemCode() {
+    document.getElementById('ins_ItemCode').value = '';
+    document.getElementById('ins_itemCodeDisplay').textContent = '';
+}
+
+document.getElementById('ins_WorkOrder').addEventListener('blur', function () {
+    const wo = this.value.trim();
+    const display = document.getElementById('ins_itemCodeDisplay');
+    if (!wo || wo.length < 11) {
+        display.textContent = wo.length > 0 ? '⚠️ Work Order cần ít nhất 11 ký tự' : '';
+        display.style.color = '#E53E3E';
+        return;
+    }
+    display.textContent = '⏳ Đang tìm...';
+    display.style.color = '#718096';
+    fetch('/Defect/OdooSearch?productionCode=' + encodeURIComponent(wo))
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(res => {
+            if (res.productCode) {
+                document.getElementById('ins_ItemCode').value = res.productCode;
+                display.textContent = '✅ ' + res.productCode;
+                display.style.color = '#2B6CB0';
+            } else {
+                display.textContent = '❌ Không tìm thấy mã sản phẩm';
+                display.style.color = '#E53E3E';
+            }
+        })
+        .catch(() => {
+            display.textContent = '❌ Lỗi kết nối Odoo';
+            display.style.color = '#E53E3E';
+        });
+});
+
+document.getElementById('ins_imageInput').addEventListener('change', function () {
+    if (this.files.length > 0) ins_handleImage(this.files[0]);
+});
+
+const ins_area = document.getElementById('ins_uploadArea');
+ins_area.addEventListener('dragover',  e => { e.preventDefault(); ins_area.style.borderColor = 'var(--sage)'; ins_area.style.background = 'var(--sage-bg)'; });
+ins_area.addEventListener('dragleave', e => { ins_area.style.borderColor = 'var(--border)'; ins_area.style.background = '#FAFCFB'; });
+ins_area.addEventListener('drop',      e => {
+    e.preventDefault();
+    ins_area.style.borderColor = 'var(--border)';
+    ins_area.style.background  = '#FAFCFB';
+    if (e.dataTransfer.files.length > 0) ins_handleImage(e.dataTransfer.files[0]);
+});
+
+}); // end DOMContentLoaded
+
+// ── Image functions — phải ở ngoài DOMContentLoaded để onclick gọi được ──
+function ins_handleImage(file) {
+    if (!file) return;
+    const allowed = ['image/jpeg','image/jpg','image/png','image/gif','image/bmp','image/webp'];
+    if (!allowed.includes(file.type)) {
+        alert('Chỉ cho phép: JPG, PNG, GIF, BMP, WEBP'); return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Ảnh không được quá 5MB'); return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('ins_previewImg').src = e.target.result;
+        document.getElementById('ins_fileName').textContent =
+            file.name + ' (' + (file.size/1024).toFixed(1) + ' KB)';
+        document.getElementById('ins_imagePreview').style.display = 'block';
+        document.getElementById('ins_uploadArea').style.display   = 'none';
+    };
+    reader.readAsDataURL(file);
+}
+
+function ins_removeImage() {
+    document.getElementById('ins_imageInput').value = '';
+    document.getElementById('ins_imagePreview').style.display = 'none';
+    document.getElementById('ins_uploadArea').style.display   = 'block';
+}
 function openEditHistory(btn) {
     const d = btn.dataset;
     document.getElementById('eh_Id').value       = d.id;
