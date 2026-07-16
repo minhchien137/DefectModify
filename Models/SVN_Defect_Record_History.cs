@@ -35,6 +35,10 @@ namespace DefectModify.Models
 
         public DateTime? Time_line { get; set; }
 
+        public DateTime? Work_Date { get; set; }
+
+        public string? Shift { get; set; }
+
     }
 }
 

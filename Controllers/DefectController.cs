@@ -20,71 +20,6 @@ namespace DefectModify.Controllers
         }
 
         // ============================================================
-        //  HELPER: Đồng bộ SVN_Defect_Record từ History theo nhóm key
-        //  Group key: (Item_code, Defect_Code, INSDatetime, Operation)
-        //  - Nếu còn history → UPDATE tổng Qty_NG vào Record
-        //  - Nếu không còn history nào → DELETE Record tương ứng
-        // ============================================================
-        private async Task SyncRecordFromHistory(
-            string? itemCode, string? defectCode,
-            string? insDatetime, string? operation)
-        {
-            var totalQty = await _context.SVN_Defect_Record_Histories
-                .Where(h => h.Item_code   == itemCode
-                         && h.Defect_Code == defectCode
-                         && h.INSDatetime == insDatetime
-                         && h.Operation   == operation)
-                .SumAsync(h => (int?)h.Qty_NG) ?? 0;
-
-            // Kiểm tra Record có tồn tại không
-            var exists = await _context.SVN_Defect_Records
-                .AnyAsync(r => r.Item_code   == itemCode
-                            && r.Defect_Code == defectCode
-                            && r.INSDatetime == insDatetime
-                            && r.Operation   == operation);
-
-            if (totalQty > 0)
-            {
-                if (exists)
-                {
-                    // Đã có → UPDATE tổng Qty_NG
-                    await _context.Database.ExecuteSqlRawAsync(
-                        @"UPDATE SVN_Defect_Record
-                          SET Qty_NG = {0}
-                          WHERE Item_code = {1} AND Defect_Code = {2}
-                            AND INSDatetime = {3} AND Operation = {4}",
-                        totalQty.ToString(), itemCode, defectCode, insDatetime, operation);
-                }
-                else
-                {
-                    // Chưa có → INSERT mới (không lưu Employer vào Record)
-                    await _context.Database.ExecuteSqlRawAsync(
-                        @"INSERT INTO SVN_Defect_Record
-                            (Item_code, Defect_Code, Qty_NG, INSDatetime, Operation)
-                          VALUES ({0}, {1}, {2}, {3}, {4})",
-                        itemCode   ?? "",
-                        defectCode ?? "",
-                        totalQty.ToString(),
-                        insDatetime ?? "",
-                        operation   ?? "");
-                }
-            }
-            else
-            {
-                if (exists)
-                {
-                    // Không còn history nào → DELETE Record
-                    await _context.Database.ExecuteSqlRawAsync(
-                        @"DELETE FROM SVN_Defect_Record
-                          WHERE Item_code = {0} AND Defect_Code = {1}
-                            AND INSDatetime = {2} AND Operation = {3}",
-                        itemCode, defectCode, insDatetime, operation);
-                }
-                // Nếu không tồn tại + totalQty = 0 → không làm gì
-            }
-        }
-
-        // ============================================================
         //  GET: /Defect/Modify
         // ============================================================
         public async Task<IActionResult> Modify(
@@ -103,7 +38,7 @@ namespace DefectModify.Controllers
             string? toStr   = dateTo?.Replace("-", "");
 
             // ---- SVN_Defect_Record_History ----
-            var histQ = _context.SVN_Defect_Record_Histories.AsQueryable();
+            var histQ = _context.SVN_Defect_Record_Histories.AsNoTracking().AsQueryable();
 
             if (!string.IsNullOrEmpty(fromStr))
                 histQ = histQ.Where(r => r.INSDatetime != null && r.INSDatetime.CompareTo(fromStr) >= 0);
@@ -115,7 +50,10 @@ namespace DefectModify.Controllers
                 histQ = histQ.Where(r => r.Operation != null && r.Operation.Contains(operation));
 
             // ---- SVN_Defect_Record ----
-            var recQ = _context.SVN_Defect_Records.AsQueryable();
+            // Bảng này không có khóa chính thật trong DB, dùng AsNoTracking để tránh
+            // EF Core ném lỗi "duplicate key" khi có nhiều dòng trùng
+            // (Item_code, Defect_Code, INSDatetime, Operation) nhưng khác Shift.
+            var recQ = _context.SVN_Defect_Records.AsNoTracking().AsQueryable();
 
             if (!string.IsNullOrEmpty(fromStr))
                 recQ = recQ.Where(r => r.INSDatetime != null && r.INSDatetime.CompareTo(fromStr) >= 0);
@@ -145,9 +83,7 @@ namespace DefectModify.Controllers
 
         // ============================================================
         //  POST: Edit SVN_Defect_Record_History
-        //  Sau khi sửa History → đồng bộ lại Record
-        //  Lưu ý: nếu đổi nhóm key (Item_code/Defect_Code/INSDatetime/Operation)
-        //         thì phải sync cả nhóm CŨ lẫn nhóm MỚI
+        //  History và Record là 2 bảng tách biệt, không tự đồng bộ.
         // ============================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -170,17 +106,12 @@ namespace DefectModify.Controllers
                 return RedirectToAction(nameof(Modify), redirectParams);
             }
 
-            // Lưu lại nhóm key CŨ trước khi thay đổi
-            var oldItemCode   = existing.Item_code;
-            var oldDefectCode = existing.Defect_Code;
-            var oldInsDate    = existing.INSDatetime;
-            var oldOperation  = existing.Operation;
-
             // Capture old values for audit log
             string oldValues = JsonSerializer.Serialize(new
             {
                 existing.Work_order, existing.Item_code, existing.Defect_Code,
                 existing.Defect_Name, existing.Qty_NG, existing.INSDatetime,
+                existing.Work_Date, existing.Shift,
                 existing.Operation, existing.Employer_code, existing.Employer_name, existing.Note
             });
 
@@ -191,6 +122,8 @@ namespace DefectModify.Controllers
             existing.Defect_Name   = model.Defect_Name;
             existing.Qty_NG        = model.Qty_NG;
             existing.INSDatetime   = model.INSDatetime;
+            existing.Work_Date     = model.Work_Date;
+            existing.Shift         = model.Shift;
             existing.Operation     = model.Operation;
             existing.Employer_code = model.Employer_code;
             existing.Employer_name = model.Employer_name;
@@ -207,6 +140,7 @@ namespace DefectModify.Controllers
                 {
                     model.Work_order, model.Item_code, model.Defect_Code,
                     model.Defect_Name, model.Qty_NG, model.INSDatetime,
+                    model.Work_Date, model.Shift,
                     model.Operation, model.Employer_code, model.Employer_name, model.Note
                 }),
                 ModifiedAt = DateTime.Now,
@@ -220,32 +154,14 @@ namespace DefectModify.Controllers
                 return RedirectToAction(nameof(Modify), redirectParams);
             }
 
-            // ---- Đồng bộ sang SVN_Defect_Record ----
-
-            // Kiểm tra nhóm key có thay đổi không
-            bool keyChanged = oldItemCode   != model.Item_code
-                           || oldDefectCode != model.Defect_Code
-                           || oldInsDate    != model.INSDatetime
-                           || oldOperation  != model.Operation;
-
-            if (keyChanged)
-            {
-                // Sync nhóm CŨ (bị mất 1 history → tính lại / xóa nếu hết)
-                await SyncRecordFromHistory(oldItemCode, oldDefectCode, oldInsDate, oldOperation);
-            }
-
-            // Sync nhóm MỚI (luôn cần cập nhật tổng)
-            await SyncRecordFromHistory(model.Item_code, model.Defect_Code, model.INSDatetime, model.Operation);
-
-            TempData["Success"] = $"Đã cập nhật bản ghi #{model.Id} và đồng bộ bản ghi lỗi thành công!";
+            TempData["Success"] = $"Đã cập nhật bản ghi #{model.Id} thành công!";
             return RedirectToAction(nameof(Modify), redirectParams);
         }
 
         // ============================================================
-        //  POST: Insert SVN_Defect_Record_History (+ upsert Record)
+        //  POST: Insert SVN_Defect_Record_History
         //  - Thêm mới 1 dòng vào History (kèm upload ảnh nếu có)
-        //  - Nếu Record cùng nhóm key đã tồn tại → cộng thêm Qty_NG
-        //  - Nếu chưa có → INSERT Record mới
+        //  - History và Record là 2 bảng tách biệt, không tự đồng bộ.
         // ============================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -321,6 +237,7 @@ namespace DefectModify.Controllers
                 {
                     model.Work_order, model.Item_code, model.Defect_Code,
                     model.Defect_Name, model.Qty_NG, model.INSDatetime,
+                    model.Work_Date, model.Shift,
                     model.Operation, model.Employer_code, model.Employer_name,
                     model.Note, model.Image_error
                 }),
@@ -335,15 +252,13 @@ namespace DefectModify.Controllers
                 return RedirectToAction(nameof(Modify), redirectParams);
             }
 
-            // ---- Upsert SVN_Defect_Record qua SyncRecordFromHistory ----
-            // Helper tự xử lý: chưa có → INSERT, đã có → UPDATE tổng Qty_NG
-            await SyncRecordFromHistory(model.Item_code, model.Defect_Code, model.INSDatetime, model.Operation);
-
-            TempData["Success"] = "Đã thêm lịch sử lỗi và đồng bộ bản ghi lỗi thành công!";
+            TempData["Success"] = "Đã thêm lịch sử lỗi thành công!";
             return RedirectToAction(nameof(Modify), redirectParams);
         }
-        //  Sau khi xóa History → tính lại tổng nhóm đó trong Record
-        //  Nếu không còn history nào → DELETE Record luôn
+
+        // ============================================================
+        //  POST: Delete SVN_Defect_Record_History
+        //  History và Record là 2 bảng tách biệt, không tự đồng bộ.
         // ============================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -366,12 +281,6 @@ namespace DefectModify.Controllers
                 return RedirectToAction(nameof(Modify), redirectParams);
             }
 
-            // Lưu lại nhóm key trước khi xóa để sync sau
-            var itemCode   = record.Item_code;
-            var defectCode = record.Defect_Code;
-            var insDate    = record.INSDatetime;
-            var operation  = record.Operation;
-
             _context.DefectEditLogs.Add(new DefectEditLog
             {
                 TableName  = "SVN_Defect_Record_History",
@@ -385,11 +294,7 @@ namespace DefectModify.Controllers
             _context.SVN_Defect_Record_Histories.Remove(record);
             await _context.SaveChangesAsync();
 
-            // ---- Đồng bộ sang SVN_Defect_Record ----
-            // SyncRecordFromHistory sẽ tự xóa Record nếu tổng = 0
-            await SyncRecordFromHistory(itemCode, defectCode, insDate, operation);
-
-            TempData["Success"] = $"Đã xóa bản ghi #{id} và đồng bộ bản ghi lỗi thành công!";
+            TempData["Success"] = $"Đã xóa bản ghi #{id} thành công!";
             return RedirectToAction(nameof(Modify), redirectParams);
         }
 
@@ -401,7 +306,7 @@ namespace DefectModify.Controllers
         public async Task<IActionResult> EditRecord(
             SVN_Defect_Record model,
             string origItemCode, string origDefectCode,
-            string origInsDatetime, string origOperation,
+            string origInsDatetime, string origOperation, string? origShift,
             string? filterDateFrom, string? filterDateTo,
             string? filterItemCode, string? filterOperation)
         {
@@ -416,20 +321,24 @@ namespace DefectModify.Controllers
             {
                 TableName  = "SVN_Defect_Record",
                 Action     = "Edit",
-                RecordId   = $"{origItemCode}|{origDefectCode}|{origInsDatetime}|{origOperation}",
-                OldValues  = JsonSerializer.Serialize(new { origItemCode, origDefectCode, origInsDatetime, origOperation }),
-                NewValues  = JsonSerializer.Serialize(new { model.Qty_NG, model.Employer_code, model.Employer_name }),
+                RecordId   = $"{origItemCode}|{origDefectCode}|{origInsDatetime}|{origOperation}|{origShift}",
+                OldValues  = JsonSerializer.Serialize(new { origItemCode, origDefectCode, origInsDatetime, origOperation, origShift }),
+                NewValues  = JsonSerializer.Serialize(new { model.Qty_NG, model.Employer_code, model.Employer_name, model.Shift }),
                 ModifiedAt = DateTime.Now,
                 ModifiedBy = User.Identity?.Name ?? "anonymous"
             });
 
+            // Shift nằm trong WHERE (theo giá trị GỐC origShift) để chỉ update
+            // đúng 1 dòng — tránh update nhầm dòng khác ca (VD: Day vs Night)
+            // có cùng Item_code/Defect_Code/INSDatetime/Operation.
             await _context.Database.ExecuteSqlRawAsync(
                 @"UPDATE SVN_Defect_Record
-                  SET Qty_NG = {0}, Employer_code = {1}, Employer_name = {2}
-                  WHERE Item_code = {3} AND Defect_Code = {4}
-                    AND INSDatetime = {5} AND Operation = {6}",
-                model.Qty_NG, model.Employer_code, model.Employer_name,
-                origItemCode, origDefectCode, origInsDatetime, origOperation);
+                  SET Qty_NG = {0}, Employer_code = {1}, Employer_name = {2}, Shift = {3}
+                  WHERE Item_code = {4} AND Defect_Code = {5}
+                    AND INSDatetime = {6} AND Operation = {7}
+                    AND ((Shift = {8}) OR (Shift IS NULL AND {8} IS NULL))",
+                model.Qty_NG, model.Employer_code, model.Employer_name, model.Shift,
+                origItemCode, origDefectCode, origInsDatetime, origOperation, origShift);
 
             await _context.SaveChangesAsync();
             TempData["Success"] = $"Đã cập nhật bản ghi {origItemCode} / {origDefectCode} thành công!";
@@ -443,7 +352,7 @@ namespace DefectModify.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteRecord(
             string itemCode, string defectCode,
-            string insDatetime, string operation,
+            string insDatetime, string operation, string? shift,
             string? filterDateFrom, string? filterDateTo,
             string? filterItemCode, string? filterOperation)
         {
@@ -458,17 +367,20 @@ namespace DefectModify.Controllers
             {
                 TableName  = "SVN_Defect_Record",
                 Action     = "Delete",
-                RecordId   = $"{itemCode}|{defectCode}|{insDatetime}|{operation}",
-                OldValues  = JsonSerializer.Serialize(new { itemCode, defectCode, insDatetime, operation }),
+                RecordId   = $"{itemCode}|{defectCode}|{insDatetime}|{operation}|{shift}",
+                OldValues  = JsonSerializer.Serialize(new { itemCode, defectCode, insDatetime, operation, shift }),
                 ModifiedAt = DateTime.Now,
                 ModifiedBy = User.Identity?.Name ?? "anonymous"
             });
 
+            // Shift nằm trong WHERE để chỉ xóa đúng 1 dòng — tránh xóa nhầm
+            // dòng khác ca có cùng Item_code/Defect_Code/INSDatetime/Operation.
             await _context.Database.ExecuteSqlRawAsync(
                 @"DELETE FROM SVN_Defect_Record
                   WHERE Item_code = {0} AND Defect_Code = {1}
-                    AND INSDatetime = {2} AND Operation = {3}",
-                itemCode, defectCode, insDatetime, operation);
+                    AND INSDatetime = {2} AND Operation = {3}
+                    AND ((Shift = {4}) OR (Shift IS NULL AND {4} IS NULL))",
+                itemCode, defectCode, insDatetime, operation, shift);
 
             await _context.SaveChangesAsync();
             TempData["Success"] = $"Đã xóa bản ghi {itemCode} / {defectCode} thành công!";

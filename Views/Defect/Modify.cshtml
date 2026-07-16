@@ -345,7 +345,7 @@
                         <tr>
                             <th>ID</th><th>Work Order</th><th>Mã SP</th>
                             <th>Mã lỗi</th><th>Tên lỗi</th><th>SL NG</th>
-                            <th>Ngày</th><th>Công đoạn</th>
+                            <th>Ngày</th><th>Ngày làm việc</th><th>Ca</th><th>Công đoạn</th>
                             <th>Mã NV</th><th>Tên NV</th>
                             <th>Ghi chú</th><th>Cập nhật lúc</th>
                             <th>Thao tác</th>
@@ -362,6 +362,8 @@
                                 <td>@r.Defect_Name</td>
                                 <td>@r.Qty_NG</td>
                                 <td>@r.INSDatetime</td>
+                                <td>@r.Work_Date?.ToString("dd/MM/yyyy")</td>
+                                <td>@r.Shift</td>
                                 <td>@r.Operation</td>
                                 <td>@r.Employer_code</td>
                                 <td>@r.Employer_name</td>
@@ -376,6 +378,8 @@
                                         data-defectname="@r.Defect_Name"
                                         data-qtyng="@r.Qty_NG"
                                         data-ins="@r.INSDatetime"
+                                        data-workdate="@r.Work_Date?.ToString("yyyy-MM-dd")"
+                                        data-shift="@r.Shift"
                                         data-op="@r.Operation"
                                         data-empcode="@r.Employer_code"
                                         data-empname="@r.Employer_name"
@@ -409,7 +413,7 @@
                         <tr>
                             <th>Mã SP</th><th>Mã lỗi</th><th>SL NG</th>
                             <th>Ngày</th><th>Công đoạn</th>
-                            <th>Mã NV</th><th>Tên NV</th>
+                            <th>Mã NV</th><th>Tên NV</th><th>Ca</th>
                             <th>Thao tác</th>
                         </tr>
                     </thead>
@@ -424,6 +428,7 @@
                                 <td>@r.Operation</td>
                                 <td>@r.Employer_code</td>
                                 <td>@r.Employer_name</td>
+                                <td>@r.Shift</td>
                                 <td>
                                     <button class="btn-act btn-act-edit me-1"
                                         data-itemcode="@r.Item_code"
@@ -433,12 +438,14 @@
                                         data-op="@r.Operation"
                                         data-empcode="@r.Employer_code"
                                         data-empname="@r.Employer_name"
+                                        data-shift="@r.Shift"
                                         onclick="openEditRecord(this)">✏️</button>
                                     <button class="btn-act btn-act-del"
                                         data-itemcode="@r.Item_code"
                                         data-defectcode="@r.Defect_Code"
                                         data-ins="@r.INSDatetime"
                                         data-op="@r.Operation"
+                                        data-shift="@r.Shift"
                                         data-label="@r.Item_code / @r.Defect_Code"
                                         onclick="openDeleteRecord(this)">🗑️</button>
                                 </td>
@@ -498,6 +505,14 @@
                             <input type="text" class="form-control" id="eh_INS" name="INSDatetime" maxlength="8" placeholder="20250425" />
                         </div>
                         <div class="col-md-4">
+                            <label class="form-label">Ngày làm việc</label>
+                            <input type="date" class="form-control" id="eh_WorkDate" name="Work_Date" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Ca</label>
+                            <input type="text" class="form-control" id="eh_Shift" name="Shift" placeholder="VD: Ca 1" />
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label">Công đoạn</label>
                             <input type="text" class="form-control" id="eh_Op" name="Operation" />
                         </div>
@@ -505,11 +520,11 @@
                             <label class="form-label">Mã nhân viên</label>
                             <input type="text" class="form-control" id="eh_EmpCode" name="Employer_code" />
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label">Tên nhân viên</label>
                             <input type="text" class="form-control" id="eh_EmpName" name="Employer_name" />
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <label class="form-label">Ghi chú</label>
                             <input type="text" class="form-control" id="eh_Note" name="Note" />
                         </div>
@@ -572,6 +587,7 @@
                 <input type="hidden" id="er_origDefectCode"  name="origDefectCode" />
                 <input type="hidden" id="er_origIns"         name="origInsDatetime" />
                 <input type="hidden" id="er_origOp"          name="origOperation" />
+                <input type="hidden" id="er_origShift"       name="origShift" />
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-6">
@@ -601,6 +617,10 @@
                         <div class="col-6">
                             <label class="form-label">Tên nhân viên</label>
                             <input type="text" class="form-control" id="er_EmpName" name="Employer_name" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Ca</label>
+                            <input type="text" class="form-control" id="er_Shift" name="Shift" placeholder="VD: Ca 1" />
                         </div>
                     </div>
                 </div>
@@ -637,6 +657,7 @@
                 <input type="hidden" id="dr_defectCode" name="defectCode" />
                 <input type="hidden" id="dr_ins"        name="insDatetime" />
                 <input type="hidden" id="dr_op"         name="operation" />
+                <input type="hidden" id="dr_shift"      name="shift" />
                 <div class="modal-footer justify-content-center">
                     <button type="button" class="btn-reset px-4" data-bs-dismiss="modal">Hủy</button>
                     <button type="submit" class="btn btn-danger px-4 ms-2">🗑️ Xác nhận xóa</button>
@@ -729,6 +750,16 @@
                         </div>
 
                         <div class="col-md-3">
+                            <label class="form-label">Ngày làm việc</label>
+                            <input type="date" class="form-control" id="ins_WorkDate" name="Work_Date" />
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Ca</label>
+                            <input type="text" class="form-control" id="ins_Shift" name="Shift" placeholder="VD: Ca 1" />
+                        </div>
+
+                        <div class="col-md-3">
                             <label class="form-label">Công đoạn <span class="text-danger">*</span></label>
                             <select class="form-select" id="ins_Operation" name="Operation" required>
                                 <option value="">-- Chọn công đoạn --</option>
@@ -768,14 +799,14 @@
                     </div>
 
                     <div style="margin-top:1rem;padding:.7rem 1rem;background:#EFF7F3;border:1px solid #D4E6DC;border-radius:8px;font-size:.79rem;color:#3E7A5E">
-                        ℹ️ <strong>Lưu ý:</strong> Sau khi thêm, hệ thống tự đồng bộ vào <strong>Bản ghi lỗi</strong> —
-                        chưa có → <strong>tạo mới</strong>, đã có → <strong>cộng thêm</strong> Qty NG.
+                        ℹ️ <strong>Lưu ý:</strong> Dữ liệu chỉ được thêm vào <strong>Lịch sử lỗi</strong>,
+                        không tự động ghi vào <strong>Bản ghi lỗi</strong>. Hai bảng này tách biệt nhau.
                     </div>
                 </div>
 
                 <div class="modal-footer">
                     <button type="button" class="btn-reset" data-bs-dismiss="modal">Hủy bỏ</button>
-                    <button type="submit" class="btn-filter ms-2">💾 Lưu &amp; đồng bộ</button>
+                    <button type="submit" class="btn-filter ms-2">💾 Lưu</button>
                 </div>
             </form>
         </div>
@@ -960,6 +991,8 @@ function openEditHistory(btn) {
     document.getElementById('eh_DefectName').value= d.defectname?? '';
     document.getElementById('eh_QtyNG').value     = d.qtyng     ?? '';
     document.getElementById('eh_INS').value       = d.ins       ?? '';
+    document.getElementById('eh_WorkDate').value  = d.workdate  ?? '';
+    document.getElementById('eh_Shift').value     = d.shift     ?? '';
     document.getElementById('eh_Op').value        = d.op        ?? '';
     document.getElementById('eh_EmpCode').value   = d.empcode   ?? '';
     document.getElementById('eh_EmpName').value   = d.empname   ?? '';
@@ -982,6 +1015,7 @@ function openEditRecord(btn) {
     document.getElementById('er_origDefectCode').value = d.defectcode ?? '';
     document.getElementById('er_origIns').value        = d.ins        ?? '';
     document.getElementById('er_origOp').value         = d.op         ?? '';
+    document.getElementById('er_origShift').value      = d.shift      ?? '';
     document.getElementById('er_ItemCode').value       = d.itemcode   ?? '';
     document.getElementById('er_DefectCode').value     = d.defectcode ?? '';
     document.getElementById('er_QtyNG').value          = d.qtyng      ?? '';
@@ -989,6 +1023,7 @@ function openEditRecord(btn) {
     document.getElementById('er_Op').value             = d.op         ?? '';
     document.getElementById('er_EmpCode').value        = d.empcode    ?? '';
     document.getElementById('er_EmpName').value        = d.empname    ?? '';
+    document.getElementById('er_Shift').value           = d.shift      ?? '';
     new bootstrap.Modal(document.getElementById('editRecordModal')).show();
 }
 
@@ -999,6 +1034,7 @@ function openDeleteRecord(btn) {
     document.getElementById('dr_defectCode').value = d.defectcode ?? '';
     document.getElementById('dr_ins').value        = d.ins        ?? '';
     document.getElementById('dr_op').value         = d.op         ?? '';
+    document.getElementById('dr_shift').value      = d.shift      ?? '';
     document.getElementById('dr_label').textContent =
         `${d.label}  |  Ngày: ${d.ins}  |  Công đoạn: ${d.op}`;
     new bootstrap.Modal(document.getElementById('deleteRecordModal')).show();

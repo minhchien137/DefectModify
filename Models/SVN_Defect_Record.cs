@@ -19,5 +19,7 @@ namespace DefectModify.Models
 
         public string? Employer_name { get; set; }
 
+        public string? Shift { get; set; }
+
     }
 }

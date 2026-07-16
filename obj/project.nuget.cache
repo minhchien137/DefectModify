@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "tpX23IhhvC4=",
+  "dgSpecHash": "Ct2FnK9frZs=",
   "success": true,
-  "projectFilePath": "C:\\DefectModify\\DefectModify.csproj",
+  "projectFilePath": "D:\\DefectModify\\DefectModify.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Minh Chien\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.bcl.asyncinterfaces\\7.0.0\\microsoft.bcl.asyncinterfaces.7.0.0.nupkg.sha512",
@@ -63,13 +63,13 @@
     "C:\\Users\\Minh Chien\\.nuget\\packages\\system.security.cryptography.protecteddata\\9.0.13\\system.security.cryptography.protecteddata.9.0.13.nupkg.sha512",
     "C:\\Users\\Minh Chien\\.nuget\\packages\\system.text.json\\9.0.0\\system.text.json.9.0.0.nupkg.sha512",
     "C:\\Users\\Minh Chien\\.nuget\\packages\\system.threading.channels\\7.0.0\\system.threading.channels.7.0.0.nupkg.sha512",
-    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.netcore.app.ref\\9.0.15\\microsoft.netcore.app.ref.9.0.15.nupkg.sha512",
-    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\9.0.15\\microsoft.netcore.app.runtime.win-x64.9.0.15.nupkg.sha512",
-    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\9.0.15\\microsoft.windowsdesktop.app.ref.9.0.15.nupkg.sha512",
-    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\9.0.15\\microsoft.windowsdesktop.app.runtime.win-x64.9.0.15.nupkg.sha512",
-    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\9.0.15\\microsoft.aspnetcore.app.ref.9.0.15.nupkg.sha512",
-    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\9.0.15\\microsoft.aspnetcore.app.runtime.win-x64.9.0.15.nupkg.sha512",
-    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\9.0.15\\microsoft.netcore.app.host.win-x64.9.0.15.nupkg.sha512"
+    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.netcore.app.ref\\9.0.16\\microsoft.netcore.app.ref.9.0.16.nupkg.sha512",
+    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\9.0.16\\microsoft.netcore.app.runtime.win-x64.9.0.16.nupkg.sha512",
+    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\9.0.16\\microsoft.windowsdesktop.app.ref.9.0.16.nupkg.sha512",
+    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\9.0.16\\microsoft.windowsdesktop.app.runtime.win-x64.9.0.16.nupkg.sha512",
+    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\9.0.16\\microsoft.aspnetcore.app.ref.9.0.16.nupkg.sha512",
+    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\9.0.16\\microsoft.aspnetcore.app.runtime.win-x64.9.0.16.nupkg.sha512",
+    "C:\\Users\\Minh Chien\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\9.0.16\\microsoft.netcore.app.host.win-x64.9.0.16.nupkg.sha512"
   ],
   "logs": []
 }

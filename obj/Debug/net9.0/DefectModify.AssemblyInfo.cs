@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DefectModify")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c75835cff8471ebe5c259e9b3332ea19e9be87f2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fffa3e594f8235992141a67ed13c1cbc9ad887de")]
 [assembly: System.Reflection.AssemblyProductAttribute("DefectModify")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DefectModify")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
