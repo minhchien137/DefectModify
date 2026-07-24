@@ -20,6 +20,116 @@ namespace DefectModify.Controllers
         }
 
         // ============================================================
+        //  Đồng bộ SVN_Defect_Record_History -> SVN_Defect_Record
+        //  Record là bảng TỔNG HỢP: Qty_NG = SUM(History.Qty_NG) theo nhóm
+        //  (Item_code, Defect_Code, Operation, Work_Date, Shift), trong đó
+        //  Work_Date/Shift được suy ra từ Time_line — CÙNG công thức với
+        //  thủ tục SVN_InsertDefectReport (không dùng cột INSDatetime/
+        //  Work_Date/Shift lưu sẵn trên History vì các cột đó không được
+        //  thủ tục/Insert action set nhất quán).
+        //  Day   : Time_line giờ > 08:00:00 và <= 20:00:00
+        //  Night : phần còn lại; nếu giờ <= 08:00:00 thì Work_Date lùi 1 ngày
+        // ============================================================
+        private static (string WorkDateStr, string Shift) ComputeWorkDateShift(DateTime timeLine)
+        {
+            var gio = timeLine.TimeOfDay;
+            var t0800 = new TimeSpan(8, 0, 0);
+            var t2000 = new TimeSpan(20, 0, 0);
+
+            string shift;
+            DateTime workDate;
+
+            if (gio > t0800 && gio <= t2000)
+            {
+                shift = "Day";
+                workDate = timeLine.Date;
+            }
+            else
+            {
+                shift = "Night";
+                workDate = gio <= t0800 ? timeLine.Date.AddDays(-1) : timeLine.Date;
+            }
+
+            return (workDate.ToString("yyyyMMdd"), shift);
+        }
+
+        // Tính lại tổng Qty_NG từ History cho đúng 1 nhóm (Item_code, Defect_Code,
+        // Operation, Work_Date, Shift) rồi ghi đè xuống Record — update nếu còn dòng
+        // History thuộc nhóm, xóa dòng Record nếu nhóm không còn dòng History nào
+        // (SP gốc chỉ MERGE/insert cho tình huống thêm mới nên không cần xóa).
+        private async Task SyncRecordGroupAsync(string? itemCode, string? defectCode, string? operation, string workDateStr, string shift)
+        {
+            if (string.IsNullOrEmpty(itemCode) || string.IsNullOrEmpty(defectCode) || string.IsNullOrEmpty(operation))
+                return;
+
+            var workDate = DateTime.ParseExact(workDateStr, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
+
+            await using var conn = new SqlConnection(_connStr);
+            await conn.OpenAsync();
+
+            decimal? qtySum;
+            await using (var sumCmd = new SqlCommand(@"
+                SELECT SUM(CAST(Qty_NG AS DECIMAL))
+                FROM dbo.SVN_Defect_Record_History
+                WHERE Item_code = @itemCode AND Defect_Code = @defectCode AND Operation = @operation
+                  AND Time_line IS NOT NULL
+                  AND (CASE WHEN Time_line <= DATEADD(HOUR, 8, CAST(CAST(Time_line AS DATE) AS DATETIME))
+                            THEN DATEADD(DAY, -1, CAST(Time_line AS DATE))
+                            ELSE CAST(Time_line AS DATE) END) = @workDate
+                  AND (CASE WHEN Time_line >  DATEADD(HOUR, 8,  CAST(CAST(Time_line AS DATE) AS DATETIME))
+                             AND Time_line <= DATEADD(HOUR, 20, CAST(CAST(Time_line AS DATE) AS DATETIME))
+                            THEN N'Day' ELSE N'Night' END) = @shift", conn))
+            {
+                sumCmd.Parameters.AddWithValue("@itemCode", itemCode);
+                sumCmd.Parameters.AddWithValue("@defectCode", defectCode);
+                sumCmd.Parameters.AddWithValue("@operation", operation);
+                sumCmd.Parameters.AddWithValue("@workDate", workDate);
+                sumCmd.Parameters.AddWithValue("@shift", shift);
+
+                var result = await sumCmd.ExecuteScalarAsync();
+                qtySum = (result == null || result == DBNull.Value) ? (decimal?)null : Convert.ToDecimal(result);
+            }
+
+            if (qtySum == null || qtySum == 0)
+            {
+                await using var delCmd = new SqlCommand(@"
+                    DELETE FROM dbo.SVN_Defect_Record
+                    WHERE Item_code = @itemCode AND Defect_Code = @defectCode
+                      AND Operation = @operation AND INSDatetime = @workDateStr AND Shift = @shift", conn);
+                delCmd.Parameters.AddWithValue("@itemCode", itemCode);
+                delCmd.Parameters.AddWithValue("@defectCode", defectCode);
+                delCmd.Parameters.AddWithValue("@operation", operation);
+                delCmd.Parameters.AddWithValue("@workDateStr", workDateStr);
+                delCmd.Parameters.AddWithValue("@shift", shift);
+                await delCmd.ExecuteNonQueryAsync();
+            }
+            else
+            {
+                await using var mergeCmd = new SqlCommand(@"
+                    MERGE INTO dbo.SVN_Defect_Record AS target
+                    USING (SELECT @itemCode AS Item_code, @defectCode AS Defect_Code,
+                                  @operation AS Operation, @qtyNG AS Qty_NG) AS source
+                        ON target.Item_code = source.Item_code
+                       AND target.Defect_Code = source.Defect_Code
+                       AND target.Operation = source.Operation
+                       AND target.INSDatetime = @workDateStr
+                       AND target.Shift = @shift
+                    WHEN MATCHED THEN
+                        UPDATE SET target.Qty_NG = source.Qty_NG
+                    WHEN NOT MATCHED THEN
+                        INSERT (Item_code, Defect_Code, Qty_NG, INSDatetime, Operation, Shift)
+                        VALUES (source.Item_code, source.Defect_Code, source.Qty_NG, @workDateStr, source.Operation, @shift);", conn);
+                mergeCmd.Parameters.AddWithValue("@itemCode", itemCode);
+                mergeCmd.Parameters.AddWithValue("@defectCode", defectCode);
+                mergeCmd.Parameters.AddWithValue("@operation", operation);
+                mergeCmd.Parameters.AddWithValue("@qtyNG", qtySum.Value);
+                mergeCmd.Parameters.AddWithValue("@workDateStr", workDateStr);
+                mergeCmd.Parameters.AddWithValue("@shift", shift);
+                await mergeCmd.ExecuteNonQueryAsync();
+            }
+        }
+
+        // ============================================================
         //  GET: /Defect/Modify
         // ============================================================
         public async Task<IActionResult> Modify(
@@ -106,6 +216,14 @@ namespace DefectModify.Controllers
                 return RedirectToAction(nameof(Modify), redirectParams);
             }
 
+            // Lưu lại khóa nhóm TRƯỚC khi sửa để sau khi lưu có thể tính lại
+            // đúng nhóm Record cũ (nếu bản ghi bị "chuyển nhóm" do đổi
+            // Item_code/Defect_Code/Operation)
+            var oldItemCode   = existing.Item_code;
+            var oldDefectCode = existing.Defect_Code;
+            var oldOperation  = existing.Operation;
+            var oldTimeLine   = existing.Time_line;
+
             // Capture old values for audit log
             string oldValues = JsonSerializer.Serialize(new
             {
@@ -151,6 +269,32 @@ namespace DefectModify.Controllers
             catch (Exception ex)
             {
                 TempData["Error"] = $"Lỗi khi lưu: {ex.InnerException?.Message ?? ex.Message}";
+                return RedirectToAction(nameof(Modify), redirectParams);
+            }
+
+            // ---- Đồng bộ sang SVN_Defect_Record ----
+            try
+            {
+                bool groupChanged = existing.Item_code != oldItemCode
+                                  || existing.Defect_Code != oldDefectCode
+                                  || existing.Operation != oldOperation
+                                  || existing.Time_line != oldTimeLine;
+
+                if (oldTimeLine.HasValue)
+                {
+                    var (oldWorkDateStr, oldShift) = ComputeWorkDateShift(oldTimeLine.Value);
+                    await SyncRecordGroupAsync(oldItemCode, oldDefectCode, oldOperation, oldWorkDateStr, oldShift);
+                }
+
+                if (groupChanged && existing.Time_line.HasValue)
+                {
+                    var (newWorkDateStr, newShift) = ComputeWorkDateShift(existing.Time_line.Value);
+                    await SyncRecordGroupAsync(existing.Item_code, existing.Defect_Code, existing.Operation, newWorkDateStr, newShift);
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Đã cập nhật History nhưng đồng bộ Record thất bại: {ex.InnerException?.Message ?? ex.Message}";
                 return RedirectToAction(nameof(Modify), redirectParams);
             }
 
@@ -252,6 +396,21 @@ namespace DefectModify.Controllers
                 return RedirectToAction(nameof(Modify), redirectParams);
             }
 
+            // ---- Đồng bộ sang SVN_Defect_Record ----
+            if (model.Time_line.HasValue)
+            {
+                try
+                {
+                    var (workDateStr, shift) = ComputeWorkDateShift(model.Time_line.Value);
+                    await SyncRecordGroupAsync(model.Item_code, model.Defect_Code, model.Operation, workDateStr, shift);
+                }
+                catch (Exception ex)
+                {
+                    TempData["Error"] = $"Đã thêm History nhưng đồng bộ Record thất bại: {ex.InnerException?.Message ?? ex.Message}";
+                    return RedirectToAction(nameof(Modify), redirectParams);
+                }
+            }
+
             TempData["Success"] = "Đã thêm lịch sử lỗi thành công!";
             return RedirectToAction(nameof(Modify), redirectParams);
         }
@@ -281,6 +440,12 @@ namespace DefectModify.Controllers
                 return RedirectToAction(nameof(Modify), redirectParams);
             }
 
+            // Lưu lại khóa nhóm trước khi xóa để tính lại Record sau khi History đã mất dòng này
+            var delItemCode   = record.Item_code;
+            var delDefectCode = record.Defect_Code;
+            var delOperation  = record.Operation;
+            var delTimeLine   = record.Time_line;
+
             _context.DefectEditLogs.Add(new DefectEditLog
             {
                 TableName  = "SVN_Defect_Record_History",
@@ -293,6 +458,21 @@ namespace DefectModify.Controllers
 
             _context.SVN_Defect_Record_Histories.Remove(record);
             await _context.SaveChangesAsync();
+
+            // ---- Đồng bộ sang SVN_Defect_Record ----
+            if (delTimeLine.HasValue)
+            {
+                try
+                {
+                    var (workDateStr, shift) = ComputeWorkDateShift(delTimeLine.Value);
+                    await SyncRecordGroupAsync(delItemCode, delDefectCode, delOperation, workDateStr, shift);
+                }
+                catch (Exception ex)
+                {
+                    TempData["Error"] = $"Đã xóa History nhưng đồng bộ Record thất bại: {ex.InnerException?.Message ?? ex.Message}";
+                    return RedirectToAction(nameof(Modify), redirectParams);
+                }
+            }
 
             TempData["Success"] = $"Đã xóa bản ghi #{id} thành công!";
             return RedirectToAction(nameof(Modify), redirectParams);
